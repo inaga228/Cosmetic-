@@ -42,7 +42,9 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build
-        run: ./gradlew build --no-daemon --stacktrace --info 2>&1
+        env:
+          JAVA_TOOL_OPTIONS: "-Xss16m -Dfile.encoding=UTF-8"
+        run: ./gradlew build --no-daemon --stacktrace 2>&1
 
       - name: Upload jar
         if: success()
