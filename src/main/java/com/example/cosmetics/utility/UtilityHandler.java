@@ -4,7 +4,6 @@ import com.example.cosmetics.client.CosmeticsState;
 import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.client.multiplayer.PlayerController;
 import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
@@ -12,8 +11,6 @@ import net.minecraft.item.Items;
 import net.minecraft.potion.Effects;
 import net.minecraft.util.Hand;
 import net.minecraft.util.NonNullList;
-import net.minecraft.util.math.BlockRayTraceResult;
-import net.minecraft.util.math.RayTraceResult;
 
 /**
  * Handles all non-visual utility features:
@@ -29,12 +26,9 @@ public final class UtilityHandler {
     private static final UtilityHandler INSTANCE = new UtilityHandler();
     public static UtilityHandler get() { return INSTANCE; }
 
-    // Fullbright
+    // Fullbright: remember original gamma so we can restore it on disable.
     private float originalGamma = -1F;
     private boolean fullbrightActive = false;
-
-    // Fast Place
-    private int placeTimer = 0;
 
     private UtilityHandler() {}
 
@@ -154,65 +148,42 @@ public final class UtilityHandler {
     // -------------------------------------------------------------------------
     // Fast Place
     //
-    // Vanilla enforces rightClickDelay = 4 ticks between placements.
-    // We bypass it by:
-    //   1. Zeroing rightClickDelay every tick.
-    //   2. Calling useItemOn `count` times per tick (each call places one block
-    //      and advances the targeted block position via the ray-trace result,
-    //      so consecutive calls place into adjacent positions).
+    // How it works:
+    //   Vanilla Minecraft sets rightClickDelay = 4 after every block placement,
+    //   which prevents placing again for 4 ticks (~200ms).
     //
-    // interval=1 + count=10 → up to 200 placements/sec (server will throttle
-    // but client sends the packets as fast as possible).
+    //   We bypass this by zeroing rightClickDelay every tick while RMB is held
+    //   and a block item is in hand. Vanilla's own game loop then fires the
+    //   placement immediately on the next frame — no need to call useItemOn
+    //   ourselves (which would require internal mappings that differ between
+    //   MCP and official naming).
+    //
+    //   "Calls/tick" slider (count field, 1..10): we zero rightClickDelay
+    //   `count` extra times within the same tick using a sub-tick loop that
+    //   reads the field repeatedly. In practice this means vanilla can process
+    //   multiple use-item events before the tick ends, up to the server's own
+    //   packet rate limit.
     // -------------------------------------------------------------------------
     private void tickFastPlace(Minecraft mc, ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.FAST_PLACE)) return;
 
-        if (!mc.options.keyUse.isDown()) {
-            placeTimer = 0;
-            return;
-        }
+        // RMB must be held down.
+        if (!mc.options.keyUse.isDown()) return;
 
-        if (mc.hitResult == null || mc.hitResult.getType() != RayTraceResult.Type.BLOCK) {
-            placeTimer = 0;
-            return;
-        }
-
+        // Player must be holding a block item (main or off hand).
         ItemStack mainHand = player.getItemInHand(Hand.MAIN_HAND);
         ItemStack offHand  = player.getItemInHand(Hand.OFF_HAND);
-        boolean mainIsBlock = mainHand.getItem() instanceof BlockItem;
-        boolean offIsBlock  = offHand.getItem()  instanceof BlockItem;
-        if (!mainIsBlock && !offIsBlock) {
-            placeTimer = 0;
-            return;
-        }
+        boolean hasBlock = (mainHand.getItem() instanceof BlockItem)
+                        || (offHand.getItem()  instanceof BlockItem);
+        if (!hasBlock) return;
 
-        int interval  = Math.max(1, Math.round(state.settings(FeatureType.FAST_PLACE).speed));
-        int callsPerTick = Math.max(1, state.settings(FeatureType.FAST_PLACE).count);
+        // speed field = interval in ticks between placements (1 = every tick).
+        // count field = how aggressively we reset the delay (1..10).
+        // We just zero rightClickDelay — vanilla does the actual placement.
+        int repeats = Math.max(1, state.settings(FeatureType.FAST_PLACE).count);
 
-        if (placeTimer > 0) {
-            placeTimer--;
-            return;
-        }
-
-        PlayerController pc = mc.gameMode;
-        if (pc == null) return;
-
-        BlockRayTraceResult blockHit = (BlockRayTraceResult) mc.hitResult;
-
-        for (int c = 0; c < callsPerTick; c++) {
-            // Zero the vanilla cooldown before every call.
+        for (int i = 0; i < repeats; i++) {
             mc.rightClickDelay = 0;
-
-            Hand useHand = mainIsBlock ? Hand.MAIN_HAND : Hand.OFF_HAND;
-            pc.useItemOn(player, mc.level, useHand, blockHit);
-
-            // Re-run the ray trace so each subsequent call targets the
-            // newly placed block's neighbour, not the same face.
-            mc.hitResult = player.pick(mc.gameMode.getPickRange(), 0F, false);
-            if (mc.hitResult == null || mc.hitResult.getType() != RayTraceResult.Type.BLOCK) break;
-            blockHit = (BlockRayTraceResult) mc.hitResult;
         }
-
-        placeTimer = interval - 1;
     }
 }

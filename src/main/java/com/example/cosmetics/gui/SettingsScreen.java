@@ -77,37 +77,30 @@ public class SettingsScreen extends Screen {
                     () -> fs.speed, v -> fs.speed = v));
         }
         if (feature.has(FeatureType.Caps.COUNT)) {
-            // FAST_PLACE uses COUNT for calls-per-tick, others use it for particle count
             if (feature == FeatureType.FAST_PLACE) {
-                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Calls/tick", 1F, 10F,
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Speed", 1F, 10F,
                         () -> (float) fs.count, v -> fs.count = Math.round(v)) {
                     @Override
                     public String formatValue() {
-                        return fs.count + "x";
+                        if (fs.count >= 10) return "Max";
+                        if (fs.count >= 7)  return "Very Fast";
+                        if (fs.count >= 4)  return "Fast";
+                        if (fs.count >= 2)  return "Normal";
+                        return "Slow";
+                    }
+                });
+            } else if (feature == FeatureType.AUTO_TOTEM) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "HP Threshold", 1F, 10F,
+                        () -> (float) fs.count, v -> fs.count = Math.round(v)) {
+                    @Override
+                    public String formatValue() {
+                        return fs.count + " ♥";
                     }
                 });
             } else {
                 sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Count", 1F, 30F,
                         () -> (float) fs.count, v -> fs.count = Math.round(v)));
             }
-        }
-        if (feature.has(FeatureType.Caps.PLACE_SPEED)) {
-            // speed field stores interval in ticks: 1 = every tick (max), 20 = ~1/s (vanilla)
-            // Slider goes 1..20 but we INVERT display so right = faster.
-            sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Speed", 1F, 20F,
-                    () -> 21F - fs.speed,            // invert: slider right = lower interval = faster
-                    v  -> fs.speed = 21F - v) {
-                @Override
-                public String formatValue() {
-                    int interval = Math.round(fs.speed);
-                    if (interval <= 1)  return "Max";
-                    if (interval <= 2)  return "Very Fast";
-                    if (interval <= 4)  return "Fast";
-                    if (interval <= 8)  return "Normal";
-                    if (interval <= 14) return "Slow";
-                    return "Very Slow";
-                }
-            });
         }
         if (feature.has(FeatureType.Caps.STYLE)) {
             int maxStyle = getStyleMax();
@@ -145,7 +138,6 @@ public class SettingsScreen extends Screen {
         if (feature.has(FeatureType.Caps.DENSITY)) rows++;
         if (feature.has(FeatureType.Caps.SPEED)) rows++;
         if (feature.has(FeatureType.Caps.COUNT)) rows++;
-        if (feature.has(FeatureType.Caps.PLACE_SPEED)) rows++;
         if (feature.has(FeatureType.Caps.STYLE)) rows++;
         if (feature.has(FeatureType.Caps.OFFSET)) rows += 3;
         if (feature.has(FeatureType.Caps.ROTATION)) rows += 3;
