@@ -177,50 +177,12 @@ public final class UtilityHandler {
                         || (offHand.getItem()  instanceof BlockItem);
         if (!hasBlock) return;
 
-        // speed field = interval in ticks between placements (1 = every tick).
-        // count field = how aggressively we reset the delay (1..10).
-        // We zero rightClickDelay via reflection so this compiles against
-        // both MCP and official (obfuscated) mappings where the field name
-        // may differ.
+        // Zero rightClickDelay so vanilla places blocks every tick instead of
+        // waiting 4 ticks between placements. With official mappings this field
+        // is correctly remapped by reobfJar at build time.
         int repeats = Math.max(1, state.settings(FeatureType.FAST_PLACE).count);
-        setRightClickDelay(mc, repeats);
-    }
-
-    private static java.lang.reflect.Field rightClickDelayField = null;
-
-    private static void setRightClickDelay(Minecraft mc, int repeats) {
-        try {
-            if (rightClickDelayField == null) {
-                // Try official mapping name first, then common MCP name.
-                for (String name : new String[]{"rightClickDelay", "missTime", "f_91073_", "field_71429_W"}) {
-                    try {
-                        java.lang.reflect.Field f = Minecraft.class.getDeclaredField(name);
-                        f.setAccessible(true);
-                        rightClickDelayField = f;
-                        break;
-                    } catch (NoSuchFieldException ignored) {}
-                }
-                if (rightClickDelayField == null) {
-                    // Last resort: search all fields for an int that looks like a small delay counter.
-                    for (java.lang.reflect.Field f : Minecraft.class.getDeclaredFields()) {
-                        if (f.getType() == int.class) {
-                            f.setAccessible(true);
-                            int val = f.getInt(mc);
-                            if (val >= 0 && val <= 10) {
-                                rightClickDelayField = f;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            if (rightClickDelayField != null) {
-                for (int i = 0; i < repeats; i++) {
-                    rightClickDelayField.setInt(mc, 0);
-                }
-            }
-        } catch (Exception ignored) {
-            // Reflection failed — Fast Place silently does nothing.
+        for (int i = 0; i < repeats; i++) {
+            mc.rightClickDelay = 0;
         }
     }
 }
