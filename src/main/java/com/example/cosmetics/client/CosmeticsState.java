@@ -65,6 +65,13 @@ public final class CosmeticsState {
             case COSMETICS_HUD: s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
             case TARGET_HUD:    s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
 
+            // Utility
+            case TRIGGER_BOT:   s.speed = 1.0F; break;   // ~4 tick cooldown at speed=1
+            case FPS_COUNTER:   s.colorR = 0.85F; s.colorG = 0.90F; s.colorB = 1.00F;
+                                s.offsetX = 4F;  s.offsetY = 4F;  break;
+            case COORDS_HUD:    s.colorR = 0.85F; s.colorG = 0.90F; s.colorB = 1.00F;
+                                s.offsetX = 4F;  s.offsetY = 16F; break;
+
             default: break;
         }
     }

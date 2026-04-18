@@ -13,26 +13,74 @@ import net.minecraft.util.math.vector.Vector3d;
 import net.minecraft.util.math.vector.Vector3f;
 
 /**
- * Wings cosmetic — two translucent wings on the player's back. Flap amplitude
- * is driven by the player's horizontal speed so the wings look like they're
- * propelling the player when running.
+ * Wings cosmetic — ONE single, hand-tuned, very pretty wing design.
  *
- * Hidden in first-person for the local player.
+ * The design is an "Ethereal" wing: dragon-shaped membrane skeleton with
+ * angelic feathered trailing edge, a bright inner glow sheet, softly
+ * pulsing bone highlights, and tip-of-the-finger sparkle dots that drift
+ * behind the wing tips. Flap amplitude is driven by the player's
+ * horizontal speed so the wings look like they're propelling the player
+ * when running.
  *
- * Styles (cycle with style slider; user-pickable):
- *   0 = DRAGON   — classic membrane wing (3 finger bones)
- *   1 = ANGEL    — clean feather rows, opaque
- *   2 = SPIRIT   — glow-blended translucent double sheet
- *   3 = BAT      — narrow leathery wings with sharp finger tips
- *   4 = PHOENIX  — large fan with bright orange/red gradient (flame palette)
- *   5 = CRYSTAL  — geometric shard wings with bright edges, glow-blended
+ * Hidden in first-person for the local player so the view stays clear.
+ *
+ * Performance: geometry tables are pre-computed as static arrays and we
+ * only call begin/endBatch once per pair (solid + glow). Two draw calls
+ * total per frame, regardless of how much flapping is happening.
  */
 public final class WingsRenderer {
 
-    public static final int STYLE_COUNT = 6;
-    public static final String[] STYLE_NAMES = {
-            "Dragon", "Angel", "Spirit", "Bat", "Phoenix", "Crystal"
+    // Kept so SettingsScreen's lookup still finds a name, but the slider
+    // is a no-op — only one style exists.
+    public static final int STYLE_COUNT = 1;
+    public static final String[] STYLE_NAMES = { "Ethereal" };
+
+    // Pre-computed wing skeleton (LEFT wing; `side` mirrors X for the right).
+    // Indices line up with the membrane triangulation and bone list below.
+    //
+    //   0 = shoulder (root)
+    //   1 = elbow
+    //   2 = wrist
+    //   3 = finger 1 tip (upper)
+    //   4 = finger 2 tip
+    //   5 = finger 3 tip
+    //   6 = finger 4 tip (trailing lower)
+    //   7 = body trailing
+    private static final float[][] WING_PTS = {
+            { 0.00F,  0.00F,  0.00F },   // 0 shoulder
+            { 0.85F,  0.35F, -0.10F },   // 1 elbow (raised)
+            { 1.55F,  0.55F, -0.25F },   // 2 wrist
+            { 1.95F,  0.25F, -0.40F },   // 3 finger 1 tip
+            { 1.80F, -0.10F, -0.55F },   // 4 finger 2 tip
+            { 1.45F, -0.45F, -0.60F },   // 5 finger 3 tip
+            { 0.95F, -0.70F, -0.50F },   // 6 finger 4 tip
+            { 0.35F, -0.55F, -0.20F },   // 7 body trailing
     };
+
+    // Triangulation of the membrane. Shoulder-fan style.
+    private static final int[][] WING_TRIS = {
+            { 0, 1, 2 }, { 0, 2, 3 }, { 0, 3, 4 },
+            { 0, 4, 5 }, { 0, 5, 6 }, { 0, 6, 7 },
+    };
+
+    // Bones to highlight with bright edges.
+    private static final int[][] WING_BONES = {
+            { 0, 1 }, { 1, 2 },
+            { 2, 3 }, { 2, 4 }, { 2, 5 }, { 2, 6 },
+    };
+
+    // Feather tufts along the trailing edge (x, y, z, length).
+    private static final float[][] FEATHERS = {
+            { 0.30F, -0.50F, -0.15F, 0.20F },
+            { 0.55F, -0.60F, -0.25F, 0.22F },
+            { 0.80F, -0.68F, -0.40F, 0.22F },
+            { 1.05F, -0.72F, -0.50F, 0.22F },
+            { 1.30F, -0.65F, -0.55F, 0.22F },
+            { 1.55F, -0.50F, -0.55F, 0.20F },
+    };
+
+    // Points where we emit the bright sparkle quads.
+    private static final int[] SPARKLE_TIPS = { 3, 4, 5, 6 };
 
     public static void render(MatrixStack ms, float partialTicks) {
         Minecraft mc = Minecraft.getInstance();
@@ -60,35 +108,37 @@ public final class WingsRenderer {
         float speed = (float) Math.sqrt(vx * vx + vz * vz);
         float flapBoost = Math.min(1.0F, speed * 10F);
 
-        // Use gameTime so wings still idle-flap gently.
+        // Animation time. Cached per-frame — avoid double Math.sin.
         float t = (player.tickCount + partialTicks) * 0.35F * fs.speed;
         float idleFlap = (float) Math.sin(t) * 0.15F;
         float moveFlap = (float) Math.sin(t * 2.2F) * 0.65F * flapBoost;
-        float flap = idleFlap + moveFlap; // [-0.8 .. 0.8] roughly
+        float flap = idleFlap + moveFlap;
+
+        // Soft pulse for bone/sparkle brightness so it feels alive.
+        float pulse = 0.70F + 0.30F * (float) Math.sin(t * 1.6F);
 
         // Attach wings on the upper back.
         double dx = px - cam.x + fs.offsetX;
         double dy = py - cam.y + 1.30 + fs.offsetY;
         double dz = pz - cam.z + fs.offsetZ;
 
-        int style = Math.floorMod(fs.style, STYLE_COUNT);
-        // Spirit + Crystal are glow-blended for the dreamy / shiny look.
-        boolean glow = style == 2 || style == 5;
         IRenderTypeBuffer.Impl buf = mc.renderBuffers().bufferSource();
-        IVertexBuilder vb = buf.getBuffer(glow ? ModRenderTypes.GLOW_QUADS : ModRenderTypes.COLOR_QUADS);
+        IVertexBuilder solid = buf.getBuffer(ModRenderTypes.COLOR_QUADS);
+        IVertexBuilder glow  = buf.getBuffer(ModRenderTypes.GLOW_QUADS);
 
-        // Phoenix style overrides user color with a fiery palette per-vertex,
-        // but we still derive a base alpha and tint multiplier from settings.
-        int r = clamp255((int)(fs.colorR * 255));
-        int g = clamp255((int)(fs.colorG * 255));
-        int b = clamp255((int)(fs.colorB * 255));
-        int a;
-        switch (style) {
-            case 2:  a = 140; break; // Spirit — soft
-            case 4:  a = 200; break; // Phoenix — bright
-            case 5:  a = 175; break; // Crystal — translucent
-            default: a = 170;
-        }
+        int r = clamp255((int) (fs.colorR * 255));
+        int g = clamp255((int) (fs.colorG * 255));
+        int b = clamp255((int) (fs.colorB * 255));
+
+        // Inner glow sheet is a brighter tint of the user's color.
+        int gr = clamp255(r + 60);
+        int gg = clamp255(g + 60);
+        int gb = clamp255(b + 60);
+
+        // Bone & sparkle color: nearly-white tint of user color, pulsing.
+        int br = clamp255((int) ((r + 180) * 0.5F + 40 * pulse));
+        int bg = clamp255((int) ((g + 180) * 0.5F + 40 * pulse));
+        int bb = clamp255((int) ((b + 255) * 0.5F + 40 * pulse));
 
         float size = Math.max(0.2F, fs.size);
 
@@ -98,9 +148,8 @@ public final class WingsRenderer {
         // Slight lean back so wings sit on the back, not on top.
         ms.mulPose(Vector3f.XP.rotationDegrees(10F));
 
-        // Left wing (rotated +flap around Z), right wing (rotated -flap).
-        drawWing(ms, vb, +1F, flap, style, size, r, g, b, a);
-        drawWing(ms, vb, -1F, flap, style, size, r, g, b, a);
+        drawWing(ms, solid, glow, +1F, flap, size, pulse, r, g, b, gr, gg, gb, br, bg, bb);
+        drawWing(ms, solid, glow, -1F, flap, size, pulse, r, g, b, gr, gg, gb, br, bg, bb);
 
         ms.popPose();
 
@@ -108,13 +157,12 @@ public final class WingsRenderer {
         buf.endBatch(ModRenderTypes.GLOW_QUADS);
     }
 
-    /**
-     * @param side  +1 for left wing, -1 for right (mirrors geometry)
-     * @param flap  flap angle in radians (positive = wing down stroke? no, up)
-     */
-    private static void drawWing(MatrixStack ms, IVertexBuilder vb,
-                                 float side, float flap, int style, float size,
-                                 int r, int g, int b, int a) {
+    private static void drawWing(MatrixStack ms,
+                                 IVertexBuilder solid, IVertexBuilder glow,
+                                 float side, float flap, float size, float pulse,
+                                 int r, int g, int b,
+                                 int gr, int gg, int gb,
+                                 int br, int bg, int bb) {
         ms.pushPose();
         // Mount point slightly offset from spine
         ms.translate(0.18F * side, 0, 0.05F);
@@ -126,174 +174,104 @@ public final class WingsRenderer {
 
         Matrix4f pose = ms.last().pose();
 
-        // Wing geometry: series of triangular membranes from root to finger tips.
-        // Points are defined as if for the LEFT wing; `side` mirrors X.
-        // Every "finger" produces two quads (membrane panels); we draw them as
-        // degenerate quads (triangle = 4 verts with 2 shared) since the render
-        // type uses GL_QUADS.
-        float s = size;
-        if (style == 0) { // DRAGON
-            float[][] pts = {
-                    {0.00F, 0.00F, 0.00F},                       // 0 shoulder
-                    {0.80F * s, 0.25F * s, -0.10F * s},          // 1 elbow
-                    {1.50F * s, 0.45F * s, -0.25F * s},          // 2 wrist
-                    {1.80F * s, 0.15F * s, -0.40F * s},          // 3 finger 1 tip
-                    {1.55F * s, -0.15F * s, -0.55F * s},         // 4 finger 2 tip
-                    {1.10F * s, -0.45F * s, -0.55F * s},         // 5 finger 3 tip
-                    {0.55F * s, -0.55F * s, -0.35F * s},         // 6 trailing edge near body
-                    {0.00F * s, -0.35F * s, -0.10F * s},         // 7 body trailing
-            };
-            // Membrane panels: (shoulder, elbow, wrist), (shoulder, wrist, f1),
-            // (shoulder, f1, f2), (shoulder, f2, f3), (shoulder, f3, rear), (shoulder, rear, body)
-            int[][] tris = {
-                    {0, 1, 2}, {0, 2, 3}, {0, 3, 4}, {0, 4, 5}, {0, 5, 6}, {0, 6, 7}
-            };
-            for (int[] tri : tris) {
-                tri3d(vb, pose, pts[tri[0]], pts[tri[1]], pts[tri[2]], side, r, g, b, a);
-            }
-            // Bone highlights (bright thin edges along fingers)
-            int br = clamp255(r + 40), bg = clamp255(g + 40), bb = clamp255(b + 40);
-            quadEdge(vb, pose, pts[0], pts[1], side, br, bg, bb, a, 0.015F);
-            quadEdge(vb, pose, pts[1], pts[2], side, br, bg, bb, a, 0.015F);
-            quadEdge(vb, pose, pts[2], pts[3], side, br, bg, bb, a, 0.015F);
-            quadEdge(vb, pose, pts[2], pts[4], side, br, bg, bb, a, 0.015F);
-            quadEdge(vb, pose, pts[2], pts[5], side, br, bg, bb, a, 0.015F);
-        } else if (style == 1) { // ANGEL — feather rows
-            int rows = 4;
-            for (int i = 0; i < rows; i++) {
-                float x0 = 0.15F * s + i * 0.30F * s;
-                float x1 = x0 + 0.45F * s;
-                float yTop = 0.10F * s - i * 0.05F * s;
-                float yBot = -0.35F * s - i * 0.03F * s;
-                float z  = -0.15F * s - i * 0.08F * s;
-                tri3d(vb, pose,
-                        new float[]{x0, yTop, z * 0.5F},
-                        new float[]{x1, yTop * 0.5F, z},
-                        new float[]{x0, yBot, z * 0.4F},
-                        side, r, g, b, a);
-                tri3d(vb, pose,
-                        new float[]{x1, yTop * 0.5F, z},
-                        new float[]{x1, yBot * 0.5F, z},
-                        new float[]{x0, yBot, z * 0.4F},
-                        side, r, g, b, a);
-            }
-        } else if (style == 2) { // SPIRIT — two stacked translucent sheets
-            float[][] a1 = {
-                    {0, 0, 0}, {1.4F * s, 0.3F * s, -0.2F * s},
-                    {1.3F * s, -0.2F * s, -0.4F * s}, {0.6F * s, -0.4F * s, -0.2F * s}
-            };
-            float[][] a2 = {
-                    {0.05F, 0.05F, 0.03F}, {1.3F * s, 0.15F * s, -0.3F * s},
-                    {1.1F * s, -0.30F * s, -0.5F * s}, {0.5F * s, -0.45F * s, -0.3F * s}
-            };
-            tri3d(vb, pose, a1[0], a1[1], a1[2], side, r, g, b, a);
-            tri3d(vb, pose, a1[0], a1[2], a1[3], side, r, g, b, a);
-            int r2 = clamp255(r + 20), g2 = clamp255(g + 20), b2 = clamp255(b + 30);
-            tri3d(vb, pose, a2[0], a2[1], a2[2], side, r2, g2, b2, (int)(a * 0.75F));
-            tri3d(vb, pose, a2[0], a2[2], a2[3], side, r2, g2, b2, (int)(a * 0.75F));
-        } else if (style == 3) { // BAT — narrow leathery wing with sharp finger tips
-            // 4 finger bones reaching down-and-back, dark thin membrane.
-            float[][] pts = {
-                    {0.00F,         0.00F,        0.00F},          // 0 shoulder
-                    {0.65F * s,    -0.05F * s,   -0.05F * s},      // 1 elbow
-                    {1.30F * s,     0.30F * s,   -0.20F * s},      // 2 wrist top
-                    {1.65F * s,    -0.30F * s,   -0.30F * s},      // 3 finger 1 down
-                    {1.40F * s,    -0.65F * s,   -0.40F * s},      // 4 finger 2 down
-                    {0.95F * s,    -0.85F * s,   -0.40F * s},      // 5 finger 3 down
-                    {0.40F * s,    -0.60F * s,   -0.20F * s},      // 6 trailing
-            };
-            int[][] tris = {
-                    {0, 1, 2}, {0, 2, 3}, {0, 3, 4}, {0, 4, 5}, {0, 5, 6}
-            };
-            // Bat membranes are darker, so dim the user color a bit.
-            int dr = clamp255((int)(r * 0.7F)), dg = clamp255((int)(g * 0.7F)), db = clamp255((int)(b * 0.7F));
-            for (int[] tri : tris) {
-                tri3d(vb, pose, pts[tri[0]], pts[tri[1]], pts[tri[2]], side, dr, dg, db, a);
-            }
-            // Bone edges — bright user color.
-            quadEdge(vb, pose, pts[0], pts[1], side, r, g, b, a, 0.012F);
-            quadEdge(vb, pose, pts[1], pts[2], side, r, g, b, a, 0.012F);
-            quadEdge(vb, pose, pts[2], pts[3], side, r, g, b, a, 0.012F);
-            quadEdge(vb, pose, pts[2], pts[4], side, r, g, b, a, 0.012F);
-            quadEdge(vb, pose, pts[2], pts[5], side, r, g, b, a, 0.012F);
-        } else if (style == 4) { // PHOENIX — fan of fiery feathers (gradient inside→outside)
-            // Hot core color pinned to flame palette but biased by user tint.
-            int hotR = 255;
-            int hotG = clamp255(180 + (g - 180) / 4);
-            int hotB = clamp255(40  + (b -  40) / 4);
-            int outR = clamp255((int)(r * 0.85F + 90));
-            int outG = clamp255((int)(g * 0.40F + 30));
-            int outB = clamp255((int)(b * 0.10F));
-            int rows = 5;
-            for (int i = 0; i < rows; i++) {
-                float fr = i / (float) (rows - 1);
-                float x0 = 0.10F * s + i * 0.30F * s;
-                float x1 = x0 + 0.55F * s + 0.05F * fr * s;
-                float yTop = 0.20F * s - i * 0.06F * s;
-                float yBot = -0.30F * s - i * 0.05F * s;
-                float z   = -0.10F * s - i * 0.10F * s;
-                int rr = clamp255((int)(hotR * (1F - fr) + outR * fr));
-                int gg = clamp255((int)(hotG * (1F - fr) + outG * fr));
-                int bb = clamp255((int)(hotB * (1F - fr) + outB * fr));
-                tri3d(vb, pose,
-                        new float[]{x0, yTop, z * 0.5F},
-                        new float[]{x1, yTop * 0.4F, z},
-                        new float[]{x0, yBot, z * 0.4F},
-                        side, rr, gg, bb, a);
-                tri3d(vb, pose,
-                        new float[]{x1, yTop * 0.4F, z},
-                        new float[]{x1, yBot * 0.5F, z},
-                        new float[]{x0, yBot, z * 0.4F},
-                        side, rr, gg, bb, a);
-            }
-        } else { // CRYSTAL — geometric shard wing with bright edges
-            // 5 angular shards radiating from the shoulder, stacked.
-            float[][][] shards = {
-                    {{0,0,0}, {0.70F * s, 0.40F * s, -0.10F * s}, {0.85F * s, 0.05F * s, -0.20F * s}},
-                    {{0,0,0}, {0.85F * s, 0.05F * s, -0.20F * s}, {1.25F * s, 0.20F * s, -0.30F * s}},
-                    {{0,0,0}, {1.25F * s, 0.20F * s, -0.30F * s}, {1.50F * s,-0.10F * s, -0.45F * s}},
-                    {{0,0,0}, {1.50F * s,-0.10F * s, -0.45F * s}, {1.20F * s,-0.40F * s, -0.50F * s}},
-                    {{0,0,0}, {1.20F * s,-0.40F * s, -0.50F * s}, {0.55F * s,-0.55F * s, -0.30F * s}},
-            };
-            // Brighter inner color, dimmer outer.
-            int br = clamp255(r + 50), bg = clamp255(g + 50), bb = clamp255(b + 50);
-            for (float[][] sh : shards) {
-                tri3d(vb, pose, sh[0], sh[1], sh[2], side, r, g, b, a);
-                // Bright outline along the two outer edges.
-                quadEdge(vb, pose, sh[1], sh[2], side, br, bg, bb, a, 0.010F);
-                quadEdge(vb, pose, sh[0], sh[2], side, br, bg, bb, (int)(a * 0.7F), 0.008F);
-            }
+        // Primary membrane (solid, semi-transparent user color).
+        int aMain = 185;
+        for (int[] tri : WING_TRIS) {
+            tri3dScaled(solid, pose, WING_PTS[tri[0]], WING_PTS[tri[1]], WING_PTS[tri[2]],
+                    side, size, r, g, b, aMain);
+        }
+
+        // Inner glow sheet — smaller, brighter, drawn slightly offset toward
+        // the viewer for a frosted-halo look.
+        int aGlow = (int) (140 * pulse);
+        float gs = size * 0.88F;
+        for (int[] tri : WING_TRIS) {
+            tri3dScaledOffset(glow, pose, WING_PTS[tri[0]], WING_PTS[tri[1]], WING_PTS[tri[2]],
+                    side, gs, 0.04F, gr, gg, gb, aGlow);
+        }
+
+        // Bone highlights (bright edges along the skeleton).
+        int aBone = (int) (210 * pulse);
+        for (int[] bone : WING_BONES) {
+            quadEdgeScaled(glow, pose, WING_PTS[bone[0]], WING_PTS[bone[1]],
+                    side, size, br, bg, bb, aBone, 0.018F);
+        }
+
+        // Feather tufts along trailing edge — thin vertical quads.
+        int aFeather = 200;
+        for (float[] f : FEATHERS) {
+            float[] base = { f[0], f[1], f[2] };
+            float[] tip  = { f[0] + 0.02F, f[1] - f[3], f[2] - 0.05F };
+            quadEdgeScaled(solid, pose, base, tip, side, size, r, g, b, aFeather, 0.032F);
+        }
+
+        // Sparkle dots at the finger tips (tiny bright diamond quads).
+        int aSparkle = clamp255((int) (235 * pulse));
+        for (int idx : SPARKLE_TIPS) {
+            sparkleQuad(glow, pose, WING_PTS[idx], side, size, br, bg, bb, aSparkle, 0.055F);
         }
 
         ms.popPose();
     }
 
-    /** Draws a triangle as a degenerate GL_QUAD (p1,p2,p3,p3). */
-    private static void tri3d(IVertexBuilder vb, Matrix4f pose,
-                              float[] p1, float[] p2, float[] p3,
-                              float side, int r, int g, int b, int a) {
-        vb.vertex(pose, p1[0] * side, p1[1], p1[2]).color(r, g, b, a).endVertex();
-        vb.vertex(pose, p2[0] * side, p2[1], p2[2]).color(r, g, b, a).endVertex();
-        vb.vertex(pose, p3[0] * side, p3[1], p3[2]).color(r, g, b, a).endVertex();
-        vb.vertex(pose, p3[0] * side, p3[1], p3[2]).color(r, g, b, a).endVertex();
+    // --- low-level primitives ------------------------------------------------
+
+    /** Triangle as a degenerate GL_QUAD with points scaled by `scale`. */
+    private static void tri3dScaled(IVertexBuilder vb, Matrix4f pose,
+                                    float[] p1, float[] p2, float[] p3,
+                                    float side, float scale, int r, int g, int b, int a) {
+        float x1 = p1[0] * scale * side, y1 = p1[1] * scale, z1 = p1[2] * scale;
+        float x2 = p2[0] * scale * side, y2 = p2[1] * scale, z2 = p2[2] * scale;
+        float x3 = p3[0] * scale * side, y3 = p3[1] * scale, z3 = p3[2] * scale;
+        vb.vertex(pose, x1, y1, z1).color(r, g, b, a).endVertex();
+        vb.vertex(pose, x2, y2, z2).color(r, g, b, a).endVertex();
+        vb.vertex(pose, x3, y3, z3).color(r, g, b, a).endVertex();
+        vb.vertex(pose, x3, y3, z3).color(r, g, b, a).endVertex();
     }
 
-    /** Thick line between two points as a thin quad (visible bone). */
-    private static void quadEdge(IVertexBuilder vb, Matrix4f pose,
-                                  float[] p1, float[] p2,
-                                  float side, int r, int g, int b, int a,
-                                  float halfW) {
-        float dx = p2[0] - p1[0];
-        float dy = p2[1] - p1[1];
-        float dz = p2[2] - p1[2];
-        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+    /** Same as {@link #tri3dScaled} but shifted by `zOffset` toward the
+     * viewer (−z in wing-local space) so the glow sheet sits in front of
+     * the membrane without z-fighting. */
+    private static void tri3dScaledOffset(IVertexBuilder vb, Matrix4f pose,
+                                          float[] p1, float[] p2, float[] p3,
+                                          float side, float scale, float zOffset,
+                                          int r, int g, int b, int a) {
+        float x1 = p1[0] * scale * side, y1 = p1[1] * scale, z1 = p1[2] * scale - zOffset;
+        float x2 = p2[0] * scale * side, y2 = p2[1] * scale, z2 = p2[2] * scale - zOffset;
+        float x3 = p3[0] * scale * side, y3 = p3[1] * scale, z3 = p3[2] * scale - zOffset;
+        vb.vertex(pose, x1, y1, z1).color(r, g, b, a).endVertex();
+        vb.vertex(pose, x2, y2, z2).color(r, g, b, a).endVertex();
+        vb.vertex(pose, x3, y3, z3).color(r, g, b, a).endVertex();
+        vb.vertex(pose, x3, y3, z3).color(r, g, b, a).endVertex();
+    }
+
+    /** Thick line between two points as a thin quad (visible bone/feather). */
+    private static void quadEdgeScaled(IVertexBuilder vb, Matrix4f pose,
+                                       float[] p1, float[] p2,
+                                       float side, float scale,
+                                       int r, int g, int b, int a,
+                                       float halfW) {
+        float ax = p1[0] * scale, ay = p1[1] * scale, az = p1[2] * scale;
+        float bx = p2[0] * scale, by = p2[1] * scale, bz = p2[2] * scale;
+        float dx = bx - ax, dy = by - ay;
+        float len = (float) Math.sqrt(dx * dx + dy * dy);
         if (len < 1e-5F) return;
-        // Perpendicular in XY plane-ish
-        float nx = -dy / len, ny = dx / len, nz = 0;
-        vb.vertex(pose, (p1[0] + nx * halfW) * side, p1[1] + ny * halfW, p1[2] + nz * halfW).color(r, g, b, a).endVertex();
-        vb.vertex(pose, (p1[0] - nx * halfW) * side, p1[1] - ny * halfW, p1[2] - nz * halfW).color(r, g, b, a).endVertex();
-        vb.vertex(pose, (p2[0] - nx * halfW) * side, p2[1] - ny * halfW, p2[2] - nz * halfW).color(r, g, b, a).endVertex();
-        vb.vertex(pose, (p2[0] + nx * halfW) * side, p2[1] + ny * halfW, p2[2] + nz * halfW).color(r, g, b, a).endVertex();
+        float nx = -dy / len, ny = dx / len;
+        vb.vertex(pose, (ax + nx * halfW) * side, ay + ny * halfW, az).color(r, g, b, a).endVertex();
+        vb.vertex(pose, (ax - nx * halfW) * side, ay - ny * halfW, az).color(r, g, b, a).endVertex();
+        vb.vertex(pose, (bx - nx * halfW) * side, by - ny * halfW, bz).color(r, g, b, a).endVertex();
+        vb.vertex(pose, (bx + nx * halfW) * side, by + ny * halfW, bz).color(r, g, b, a).endVertex();
+    }
+
+    /** A tiny diamond quad centered on `p` — the sparkle dot at a tip. */
+    private static void sparkleQuad(IVertexBuilder vb, Matrix4f pose, float[] p,
+                                    float side, float scale, int r, int g, int b, int a,
+                                    float half) {
+        float cx = p[0] * scale * side, cy = p[1] * scale, cz = p[2] * scale;
+        vb.vertex(pose, cx,         cy + half, cz).color(r, g, b, a).endVertex();
+        vb.vertex(pose, cx - half,  cy,        cz).color(r, g, b, a).endVertex();
+        vb.vertex(pose, cx,         cy - half, cz).color(r, g, b, a).endVertex();
+        vb.vertex(pose, cx + half,  cy,        cz).color(r, g, b, a).endVertex();
     }
 
     private static int clamp255(int v) { return Math.max(0, Math.min(255, v)); }

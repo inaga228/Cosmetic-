@@ -13,6 +13,11 @@ import com.example.cosmetics.render.HatRenderer;
 import com.example.cosmetics.render.TrailRenderer;
 import com.example.cosmetics.render.WingsRenderer;
 import com.example.cosmetics.trails.TrailTicker;
+import com.example.cosmetics.utility.AutoSprint;
+import com.example.cosmetics.utility.AutoTool;
+import com.example.cosmetics.utility.FullBright;
+import com.example.cosmetics.utility.TriggerBot;
+import com.example.cosmetics.utility.UtilityHud;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.BlockItem;
@@ -64,6 +69,12 @@ public final class ClientEvents {
         HandRenderer.tickPlaceAnim();
         JumpCircles.get().tick();
         detectJumpAndLanding(mc.player);
+
+        // Utility tickers (all no-op when their feature is disabled).
+        TriggerBot.tick();
+        AutoSprint.tick();
+        FullBright.tick();
+        AutoTool.tick();
     }
 
     private static void detectJumpAndLanding(ClientPlayerEntity player) {
@@ -104,6 +115,7 @@ public final class ClientEvents {
         if (event.getType() != RenderGameOverlayEvent.ElementType.ALL) return;
         CosmeticsHud.render(event.getMatrixStack(), event.getPartialTicks());
         TargetHud.render(event.getMatrixStack(), event.getPartialTicks());
+        UtilityHud.render(event.getMatrixStack(), event.getPartialTicks());
     }
 
     @SubscribeEvent

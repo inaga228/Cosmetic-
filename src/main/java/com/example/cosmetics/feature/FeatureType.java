@@ -18,9 +18,9 @@ public enum FeatureType {
     // Hat (hidden in first-person to keep view clear)
     CHINA_HAT   ("China Hat",       Category.HAT,     Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.OFFSET),
 
-    // Wings (flap anim driven by player speed). Style picks one of the
-    // visual presets — Dragon / Angel / Spirit / Bat / Phoenix / Crystal.
-    DRAGON_WINGS ("Wings",          Category.WINGS,   Caps.COLOR | Caps.SIZE | Caps.SPEED | Caps.STYLE | Caps.OFFSET),
+    // Wings (single hand-tuned "Ethereal" style). Flap anim driven by
+    // player speed. Hidden in first-person.
+    DRAGON_WINGS ("Wings",          Category.WINGS,   Caps.COLOR | Caps.SIZE | Caps.SPEED | Caps.OFFSET),
 
     // Movement effects: jump ring + landing ring on the ground
     JUMP_CIRCLES  ("Jump Circles",  Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.SPEED),
@@ -36,9 +36,17 @@ public enum FeatureType {
     // View model / animations
     VIEW_MODEL       ("View Model",          Category.ANIM, Caps.OFFSET | Caps.ROTATION),
     CUSTOM_ATTACK    ("Custom Attack Anim",  Category.ANIM, Caps.SIZE),
-    CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE);
+    CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE),
 
-    public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM }
+    // Utility (non-visual QoL helpers)
+    TRIGGER_BOT   ("Trigger Bot",    Category.UTILITY, Caps.SPEED),   // SPEED = cooldown in ticks
+    AUTO_SPRINT   ("Auto Sprint",    Category.UTILITY, 0),
+    FULL_BRIGHT   ("Full Bright",    Category.UTILITY, 0),
+    FPS_COUNTER   ("FPS Counter",    Category.UTILITY, Caps.COLOR | Caps.OFFSET),
+    AUTO_TOOL     ("Auto Tool",      Category.UTILITY, 0),
+    COORDS_HUD    ("Coords HUD",     Category.UTILITY, Caps.COLOR | Caps.OFFSET);
+
+    public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
     /** Bitmask of which settings fields this feature uses. */
     public static final class Caps {
