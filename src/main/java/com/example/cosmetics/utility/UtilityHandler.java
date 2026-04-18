@@ -5,7 +5,11 @@ import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
 import net.minecraft.entity.player.PlayerAbilities;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.potion.Effects;
+import net.minecraft.util.Hand;
+import net.minecraft.util.NonNullList;
 
 /**
  * Handles all non-visual utility features:
@@ -13,8 +17,7 @@ import net.minecraft.potion.Effects;
  *  - Auto Jump
  *  - Auto Sneak
  *  - Fullbright
- *  - No Fall Damage
- *  - Step Assist
+ *  - Auto Totem (moves a totem to offhand when HP <= threshold)
  *
  * Called once per client tick from ClientEvents.
  */
@@ -26,10 +29,6 @@ public final class UtilityHandler {
     // Fullbright: remember original gamma so we can restore it on disable.
     private float originalGamma = -1F;
     private boolean fullbrightActive = false;
-
-    // Step assist: remember original step height.
-    private float originalStepHeight = -1F;
-    private boolean stepAssistActive = false;
 
     private UtilityHandler() {}
 
@@ -43,22 +42,18 @@ public final class UtilityHandler {
         tickAutoJump(player, state);
         tickAutoSneak(player, state);
         tickFullbright(mc, state);
-        tickNoFall(player, state);
-        tickStepAssist(player, state);
+        tickAutoTotem(player, state);
     }
 
     // -------------------------------------------------------------------------
-    // Auto Sprint — constantly hold the sprint key as long as player is moving.
+    // Auto Sprint
     // -------------------------------------------------------------------------
     private void tickAutoSprint(ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.AUTO_SPRINT)) return;
-
-        // Don't sprint while sneaking, in water/lava or when blind.
         if (player.isCrouching()) return;
         if (player.isInWater() || player.isInLava()) return;
         if (player.hasEffect(Effects.BLINDNESS)) return;
 
-        // Check if the player is trying to move forward.
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.keyUp.isDown()) {
             player.setSprinting(true);
@@ -66,7 +61,7 @@ public final class UtilityHandler {
     }
 
     // -------------------------------------------------------------------------
-    // Auto Jump — jump continuously while the player is on the ground and moving.
+    // Auto Jump
     // -------------------------------------------------------------------------
     private void tickAutoJump(ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.AUTO_JUMP)) return;
@@ -85,7 +80,7 @@ public final class UtilityHandler {
     }
 
     // -------------------------------------------------------------------------
-    // Auto Sneak — hold sneak while the player is not moving.
+    // Auto Sneak
     // -------------------------------------------------------------------------
     private void tickAutoSneak(ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.AUTO_SNEAK)) return;
@@ -96,30 +91,23 @@ public final class UtilityHandler {
                 || mc.options.keyLeft.isDown()
                 || mc.options.keyRight.isDown();
 
-        // Simulate sneak when standing still (not when moving).
         PlayerAbilities abilities = player.abilities;
         if (!moving && !abilities.flying) {
-            // We set the player input directly; this emulates holding shift.
             mc.options.keyShift.setDown(true);
-        } else {
-            // Only release if auto-sneak set it (keyShift could also be held by user).
-            // We simply let Minecraft's normal input handle it when moving.
         }
     }
 
     // -------------------------------------------------------------------------
-    // Fullbright — set gamma to max while enabled, restore on disable.
+    // Fullbright
     // -------------------------------------------------------------------------
     private void tickFullbright(Minecraft mc, CosmeticsState state) {
         boolean wantOn = state.isOn(FeatureType.FULLBRIGHT);
 
         if (wantOn && !fullbrightActive) {
-            // Turning on: save original gamma and apply fullbright value.
             originalGamma = (float)(double) mc.options.gamma;
-            mc.options.gamma = 16.0D; // 16 is well above 1.0 — effectively fullbright.
+            mc.options.gamma = 16.0D;
             fullbrightActive = true;
         } else if (!wantOn && fullbrightActive) {
-            // Turning off: restore saved gamma.
             if (originalGamma >= 0) {
                 mc.options.gamma = originalGamma;
             }
@@ -128,36 +116,51 @@ public final class UtilityHandler {
     }
 
     // -------------------------------------------------------------------------
-    // No Fall Damage — reset fall distance every tick.
+    // Auto Totem
+    // Если HP игрока <= порогу (в очках здоровья, т.е. count * 2 = поинты),
+    // ищем тотем бессмертия в инвентаре и перемещаем его в оффхенд.
     // -------------------------------------------------------------------------
-    private void tickNoFall(ClientPlayerEntity player, CosmeticsState state) {
-        if (!state.isOn(FeatureType.NO_FALL)) return;
-        // Resetting fallDistance to 0 every tick means the server never
-        // registers enough distance to deal damage.
-        player.fallDistance = 0F;
-    }
+    private void tickAutoTotem(ClientPlayerEntity player, CosmeticsState state) {
+        if (!state.isOn(FeatureType.AUTO_TOTEM)) return;
 
-    // -------------------------------------------------------------------------
-    // Step Assist — raise stepHeight so the player walks up 1-block steps
-    //               without jumping (like horses / boats).
-    // -------------------------------------------------------------------------
-    private void tickStepAssist(ClientPlayerEntity player, CosmeticsState state) {
-        boolean wantOn = state.isOn(FeatureType.STEP_ASSIST);
+        // count хранится как число «сердец» (1 сердце = 2 HP points).
+        // По умолчанию 6 = 6 сердец = 12 HP.
+        int thresholdHearts = state.settings(FeatureType.AUTO_TOTEM).count;
+        float thresholdHp = thresholdHearts * 2.0F;
 
-        // Read configured step height from settings (size slider, default 1.0 = 1 block).
-        float configuredHeight = CosmeticsState.get().settings(FeatureType.STEP_ASSIST).size;
-        float targetHeight = Math.max(0.6F, Math.min(2.0F, configuredHeight));
+        float currentHp = player.getHealth();
 
-        if (wantOn && !stepAssistActive) {
-            originalStepHeight = player.maxUpStep;
-            player.maxUpStep = targetHeight;
-            stepAssistActive = true;
-        } else if (wantOn) {
-            // Update in case the slider changed.
-            player.maxUpStep = targetHeight;
-        } else if (!wantOn && stepAssistActive) {
-            player.maxUpStep = (originalStepHeight >= 0F) ? originalStepHeight : 0.6F;
-            stepAssistActive = false;
+        // Тотем уже в оффхенде — ничего делать не нужно.
+        ItemStack offhand = player.getItemInHand(Hand.OFF_HAND);
+        if (offhand.getItem() == Items.TOTEM_OF_UNDYING) return;
+
+        // Проверяем порог HP.
+        if (currentHp > thresholdHp) return;
+
+        // Ищем тотем в основном инвентаре (хотбар + основной инвентарь).
+        NonNullList<ItemStack> inv = player.inventory.items;
+        int totemSlot = -1;
+        for (int i = 0; i < inv.size(); i++) {
+            if (inv.get(i).getItem() == Items.TOTEM_OF_UNDYING) {
+                totemSlot = i;
+                break;
+            }
+        }
+
+        if (totemSlot == -1) return; // тотема нет в инвентаре
+
+        // Swap: тотем из инвентаря → оффхенд, оффхенд → в тот же слот инвентаря.
+        ItemStack totem = inv.get(totemSlot);
+        ItemStack currentOffhand = player.getItemInHand(Hand.OFF_HAND).copy();
+
+        // Устанавливаем тотем в оффхенд.
+        player.inventory.offhand.set(0, totem.copy());
+
+        // Кладём то, что было в оффхенде, обратно в освободившийся слот.
+        if (currentOffhand.isEmpty()) {
+            inv.set(totemSlot, ItemStack.EMPTY);
+        } else {
+            inv.set(totemSlot, currentOffhand);
         }
     }
 }

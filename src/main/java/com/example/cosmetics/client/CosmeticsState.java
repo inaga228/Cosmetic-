@@ -66,7 +66,8 @@ public final class CosmeticsState {
             case TARGET_HUD:    s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
 
             // Utility
-            case STEP_ASSIST:   s.size = 1.0F; break; // 1.0 = walk up 1-block steps
+            // AUTO_TOTEM: count = HP threshold in hearts (default 6 hearts = 12 HP)
+            case AUTO_TOTEM:    s.count = 6; break;
 
             default: break;
         }

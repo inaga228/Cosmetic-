@@ -18,18 +18,17 @@ public enum FeatureType {
     // Hat (hidden in first-person to keep view clear)
     CHINA_HAT   ("China Hat",       Category.HAT,     Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.OFFSET),
 
-    // Wings (flap anim driven by player speed). Style picks one of the
-    // visual presets — Dragon / Angel / Spirit / Bat / Phoenix / Crystal.
+    // Wings (flap anim driven by player speed).
     DRAGON_WINGS ("Wings",          Category.WINGS,   Caps.COLOR | Caps.SIZE | Caps.SPEED | Caps.STYLE | Caps.OFFSET),
 
-    // Movement effects: jump ring + landing ring on the ground
+    // Movement effects
     JUMP_CIRCLES  ("Jump Circles",  Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.SPEED),
     LANDING_RING  ("Landing Ring",  Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE),
 
-    // Hit effects (more styles: slash, stars, crit, ripple, shards, bolt)
+    // Hit effects
     HIT_EFFECT  ("Hit Effect",      Category.COMBAT,  Caps.COLOR | Caps.SIZE | Caps.COUNT | Caps.STYLE),
 
-    // HUDs — now with multiple style/themes
+    // HUDs
     COSMETICS_HUD ("Cosmetics HUD", Category.HUD,     Caps.COLOR | Caps.STYLE),
     TARGET_HUD    ("Target HUD",    Category.HUD,     Caps.COLOR | Caps.STYLE),
 
@@ -39,12 +38,12 @@ public enum FeatureType {
     CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE),
 
     // Utility — no visual, pure gameplay helpers
+    // COUNT field = HP threshold (hearts) for AUTO_TOTEM
     AUTO_SPRINT  ("Auto Sprint",    Category.UTILITY, 0),
     AUTO_JUMP    ("Auto Jump",      Category.UTILITY, 0),
     AUTO_SNEAK   ("Auto Sneak",     Category.UTILITY, 0),
     FULLBRIGHT   ("Fullbright",     Category.UTILITY, 0),
-    NO_FALL      ("No Fall Damage", Category.UTILITY, 0),
-    STEP_ASSIST  ("Step Assist",    Category.UTILITY, Caps.SIZE);
+    AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
