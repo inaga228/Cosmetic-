@@ -33,15 +33,31 @@ public final class CosmeticsState {
 
     private static void applyDefaults(FeatureType f, FeatureSettings s) {
         switch (f) {
-            case RAINBOW_TRAIL: s.size = 0.35F; s.density = 1.5F; break;
-            case FLAME_TRAIL:   s.colorR = 1.0F; s.colorG = 0.55F; s.colorB = 0.1F; s.size = 0.4F; break;
-            case GALAXY_TRAIL:  s.colorR = 0.7F; s.colorG = 0.5F; s.colorB = 1.0F; s.size = 0.25F; break;
-            case AURA:          s.colorR = 0.55F; s.colorG = 0.35F; s.colorB = 1.0F; break;
-            case SNOW_AURA:     s.colorR = 0.9F; s.colorG = 0.95F; s.colorB = 1.0F; break;
-            case HEART_AURA:    s.colorR = 1.0F; s.colorG = 0.25F; s.colorB = 0.4F; break;
-            case CHINA_HAT:     s.colorR = 0.85F; s.colorG = 0.2F; s.colorB = 0.25F;
+            // Trails (3D ribbon)
+            case RAINBOW_TRAIL: s.size = 0.55F; s.density = 1.0F; break;
+            case FLAME_TRAIL:   s.colorR = 1.0F; s.colorG = 0.55F; s.colorB = 0.1F; s.size = 0.60F; break;
+            case GALAXY_TRAIL:  s.colorR = 0.70F; s.colorG = 0.50F; s.colorB = 1.00F; s.size = 0.45F; break;
+
+            // Auras
+            case AURA:          s.colorR = 0.55F; s.colorG = 0.35F; s.colorB = 1.00F; break;
+            case SNOW_AURA:     s.colorR = 0.90F; s.colorG = 0.95F; s.colorB = 1.00F; break;
+            case HEART_AURA:    s.colorR = 1.00F; s.colorG = 0.25F; s.colorB = 0.40F; break;
+
+            // Hat
+            case CHINA_HAT:     s.colorR = 0.85F; s.colorG = 0.20F; s.colorB = 0.25F;
                                 s.offsetY = 0.0F; s.size = 1.0F; break;
-            case HIT_EFFECT:    s.colorR = 1.0F; s.colorG = 0.2F; s.colorB = 0.2F; s.count = 8; break;
+
+            // Dragon wings (small, pretty, lilac by default)
+            case DRAGON_WINGS:  s.colorR = 0.60F; s.colorG = 0.30F; s.colorB = 1.00F;
+                                s.size = 0.75F; s.speed = 1.0F; s.style = 0; break;
+
+            // Combat
+            case HIT_EFFECT:    s.colorR = 1.00F; s.colorG = 0.20F; s.colorB = 0.20F; s.count = 8; break;
+
+            // HUDs — default to style 0 (classic neon-purple)
+            case COSMETICS_HUD: s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
+            case TARGET_HUD:    s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
+
             default: break;
         }
     }

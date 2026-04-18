@@ -9,6 +9,8 @@ import com.example.cosmetics.hud.TargetHud;
 import com.example.cosmetics.particles.ParticleManager;
 import com.example.cosmetics.render.HandRenderer;
 import com.example.cosmetics.render.HatRenderer;
+import com.example.cosmetics.render.TrailRenderer;
+import com.example.cosmetics.render.WingsRenderer;
 import com.example.cosmetics.trails.TrailTicker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.BlockItem;
@@ -62,6 +64,8 @@ public final class ClientEvents {
     @SubscribeEvent
     public static void onRenderWorldLast(RenderWorldLastEvent event) {
         ParticleManager.get().renderAll(event.getMatrixStack(), event.getPartialTicks());
+        TrailRenderer.render(event.getMatrixStack(), event.getPartialTicks());
+        WingsRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         HatRenderer.render(event.getMatrixStack(), event.getPartialTicks());
     }
 

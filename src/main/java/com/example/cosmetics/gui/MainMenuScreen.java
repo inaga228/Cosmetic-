@@ -4,9 +4,12 @@ import com.example.cosmetics.client.CosmeticsState;
 import com.example.cosmetics.feature.FeatureType;
 import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screen.ConfirmOpenLinkScreen;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.util.Util;
 import net.minecraft.util.text.StringTextComponent;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,9 +17,11 @@ import java.util.List;
  * Main cosmetics menu.
  * Left side: category tabs. Right side: feature cards.
  * LMB = toggle, RMB = open settings.
- * Beautiful gradient style with glow, rounded corners, hover effects.
+ * Bottom-right: a pretty GitHub button that opens the mod's repo.
  */
 public class MainMenuScreen extends Screen {
+
+    private static final String REPO_URL = "https://github.com/inaga228/Cosmetic-mod";
 
     private FeatureType.Category current = FeatureType.Category.TRAILS;
     private long openedAtMs;
@@ -26,9 +31,7 @@ public class MainMenuScreen extends Screen {
 
     private final List<CategoryTab> categoryTabs = new ArrayList<>();
     private final List<FeatureCard> cards = new ArrayList<>();
-
-    // For smooth card hover animation
-    private final float[] cardHover = new float[FeatureType.values().length];
+    private GitHubButton githubButton;
 
     public MainMenuScreen() { super(new StringTextComponent("Cosmetics")); }
 
@@ -40,29 +43,32 @@ public class MainMenuScreen extends Screen {
         closing = false;
         categoryTabs.clear();
 
-        int panelW = 380;
-        int panelH = 240;
+        int panelW = 400;
+        int panelH = 260;
         int px = (this.width - panelW) / 2;
         int py = (this.height - panelH) / 2;
 
         int i = 0;
         for (FeatureType.Category c : FeatureType.Category.values()) {
-            categoryTabs.add(new CategoryTab(px + 8, py + 44 + i * 26, 96, 22, c));
+            categoryTabs.add(new CategoryTab(px + 8, py + 44 + i * 24, 96, 20, c));
             i++;
         }
         rebuildCards(px, py);
+
+        // Bottom-right GitHub button inside the panel
+        githubButton = new GitHubButton(px + panelW - 96, py + panelH - 28, 88, 20);
     }
 
     private void rebuildCards(int px, int py) {
         cards.clear();
         int cx = px + 114;
         int cy = py + 44;
-        int cw = 250;
-        int ch = 24;
+        int cw = 270;
+        int ch = 22;
         int i = 0;
         for (FeatureType f : FeatureType.values()) {
             if (f.category != current) continue;
-            cards.add(new FeatureCard(cx, cy + i * (ch + 5), cw, ch, f));
+            cards.add(new FeatureCard(cx, cy + i * (ch + 4), cw, ch, f));
             i++;
         }
     }
@@ -71,11 +77,10 @@ public class MainMenuScreen extends Screen {
     public void render(MatrixStack ms, int mouseX, int mouseY, float partialTicks) {
         float anim = animProgress();
 
-        // Dim background
         fill(ms, 0, 0, this.width, this.height, (int)(anim * 155) << 24);
 
-        int panelW = 380;
-        int panelH = 240;
+        int panelW = 400;
+        int panelH = 260;
         int px = (this.width - panelW) / 2;
         int py = (this.height - panelH) / 2;
 
@@ -87,17 +92,14 @@ public class MainMenuScreen extends Screen {
 
         GuiDraw.roundedPanel(ms, px, py, panelW, panelH, anim);
 
-        // Gradient title bar
         int titleA = clamp((int)(anim * 255));
         int barTop = (titleA << 24) | 0x1A1430;
         int barBot = (titleA << 24) | 0x120E22;
         fillGradient(ms, px + 2, py + 2, px + panelW - 2, py + 36, barTop, barBot);
 
-        // Title text
-        int titleCol = (clamp((int)(anim * 255)) << 24) | 0xFFFFFF;
-        drawCenteredString(ms, this.font, "✦ Cosmetics ✦", px + panelW / 2, py + 13, titleCol);
+        int titleCol = (titleA << 24) | 0xFFFFFF;
+        drawCenteredString(ms, this.font, "\u2726 Cosmetics \u2726", px + panelW / 2, py + 13, titleCol);
 
-        // Accent underline (glow effect)
         int glowC = (clamp((int)(anim * 200)) << 24) | 0x9B6DFF;
         fill(ms, px + panelW / 2 - 55, py + 28, px + panelW / 2 + 55, py + 30, glowC);
         fill(ms, px + panelW / 2 - 40, py + 30, px + panelW / 2 + 40, py + 31,
@@ -106,9 +108,11 @@ public class MainMenuScreen extends Screen {
         for (CategoryTab c : categoryTabs) c.draw(ms, mouseX, mouseY, anim, current);
         for (FeatureCard c : cards) c.draw(ms, mouseX, mouseY, anim);
 
+        if (githubButton != null) githubButton.draw(ms, mouseX, mouseY, anim);
+
         int hintA = clamp((int)(anim * 160));
         drawCenteredString(ms, this.font, "LMB toggle  |  RMB settings  |  ESC close",
-                px + panelW / 2, py + panelH - 13, (hintA << 24) | 0xAAAAAA);
+                px + panelW / 2 - 48, py + panelH - 13, (hintA << 24) | 0xAAAAAA);
 
         ms.popPose();
 
@@ -120,7 +124,13 @@ public class MainMenuScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (closing) return false;
-        int panelW = 380, panelH = 240;
+
+        if (githubButton != null && githubButton.contains(mx, my)) {
+            openRepo();
+            return true;
+        }
+
+        int panelW = 400, panelH = 260;
         int px = (this.width - panelW) / 2;
         int py = (this.height - panelH) / 2;
         for (CategoryTab c : categoryTabs) {
@@ -141,6 +151,22 @@ public class MainMenuScreen extends Screen {
             }
         }
         return super.mouseClicked(mx, my, button);
+    }
+
+    private void openRepo() {
+        Minecraft mc = Minecraft.getInstance();
+        final MainMenuScreen self = this;
+        // Respect Minecraft's "confirm before opening links" setting.
+        mc.setScreen(new ConfirmOpenLinkScreen(ok -> {
+            if (ok) {
+                try {
+                    Util.getPlatform().openUri(new URI(REPO_URL));
+                } catch (Exception e) {
+                    // Fallback: silently ignore — the user can visit manually.
+                }
+            }
+            mc.setScreen(self);
+        }, REPO_URL, true));
     }
 
     @Override
@@ -192,7 +218,6 @@ public class MainMenuScreen extends Screen {
             int base = blendColor(0xFF1A1730, 0xFF2B2550, sel ? 1F : hoverAnim);
             fill(ms, x, y, x + w, y + h, withAlpha(base, alpha));
 
-            // Left accent bar
             if (sel) {
                 fill(ms, x, y, x + 3, y + h, withAlpha(0xFF9B6DFF, alpha));
                 fill(ms, x + 3, y, x + 4, y + h, withAlpha(0x409B6DFF, alpha));
@@ -224,43 +249,75 @@ public class MainMenuScreen extends Screen {
             boolean on = CosmeticsState.get().isOn(feature);
             hoverAnim += ((hover ? 1F : 0F) - hoverAnim) * 0.25F;
 
-            // Card background with hover glow
             int base = blendColor(0xFF16132A, 0xFF201C38, hoverAnim);
             fill(ms, x, y, x + w, y + h, withAlpha(base, alpha));
 
-            // Enabled accent bar
             if (on) {
                 fill(ms, x, y, x + 3, y + h, withAlpha(0xFF8A5CFF, alpha));
                 fill(ms, x + 3, y, x + 5, y + h, withAlpha(0x508A5CFF, alpha));
             }
 
-            // Hover shimmer on top edge
             if (hoverAnim > 0.05F) {
                 fill(ms, x, y, x + w, y + 1, withAlpha(0xFF8A5CFF, alpha * hoverAnim * 0.5F));
             }
 
-            // Feature name
             int nameCol = withAlpha(on ? 0xFFE8D8FF : 0xFFCCCCCC, alpha);
             drawString(ms, font, feature.displayName, x + 10, y + (h - 8) / 2, nameCol);
 
-            // ON/OFF pill toggle
             int pillW = 28, pillH = 12;
             int pX = x + w - pillW - 8;
             int pY = y + (h - pillH) / 2;
             int pillBg = on ? withAlpha(0xFF7A4CFF, alpha) : withAlpha(0xFF3A3650, alpha);
             fill(ms, pX, pY, pX + pillW, pY + pillH, pillBg);
 
-            // Knob
             int knobX = on ? pX + pillW - pillH + 1 : pX + 1;
             int knobY = pY + 1;
             int knobS = pillH - 2;
             fill(ms, knobX, knobY, knobX + knobS, knobY + knobS, withAlpha(0xFFFFFFFF, alpha));
 
-            // Settings hint on hover
             if (hoverAnim > 0.3F && !on) {
                 int hintA = (int)(alpha * hoverAnim * 120);
                 drawString(ms, font, "RMB", pX - 22, y + (h - 8) / 2, (hintA << 24) | 0x9B6DFF);
             }
+        }
+    }
+
+    /** Pretty GitHub button with icon glyph, gradient and hover glow. */
+    private class GitHubButton {
+        final int x, y, w, h;
+        private float hoverAnim = 0F;
+
+        GitHubButton(int x, int y, int w, int h) {
+            this.x = x; this.y = y; this.w = w; this.h = h;
+        }
+
+        boolean contains(double mx, double my) {
+            return mx >= x && mx <= x + w && my >= y && my <= y + h;
+        }
+
+        void draw(MatrixStack ms, int mx, int my, float alpha) {
+            boolean hover = contains(mx, my);
+            hoverAnim += ((hover ? 1F : 0F) - hoverAnim) * 0.2F;
+
+            // Outer glow
+            int glowA = (int)(alpha * 50 * (0.4F + 0.6F * hoverAnim));
+            for (int i = 3; i >= 1; i--) {
+                int ga = Math.max(0, glowA - i * 8);
+                fill(ms, x - i, y - i, x + w + i, y + h + i, (ga << 24) | 0x9B6DFF);
+            }
+
+            int top = blendColor(0xFF2A1E4A, 0xFF4B2E90, hoverAnim);
+            int bot = blendColor(0xFF180F2A, 0xFF2A1D55, hoverAnim);
+            fillGradient(ms, x, y, x + w, y + h, withAlpha(top, alpha), withAlpha(bot, alpha));
+
+            // Top accent line
+            fill(ms, x, y, x + w, y + 1, withAlpha(0xFFB98FFF, alpha * (0.5F + 0.5F * hoverAnim)));
+
+            String label = "\u2605 GitHub";
+            int lx = x + (w - font.width(label)) / 2;
+            int ly = y + (h - 8) / 2;
+            int col = withAlpha(0xFFFFFFFF, alpha);
+            font.drawShadow(ms, label, lx, ly, col);
         }
     }
 

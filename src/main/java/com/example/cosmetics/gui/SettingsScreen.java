@@ -124,8 +124,14 @@ public class SettingsScreen extends Screen {
     }
 
     private String[] getStyleLabels() {
-        if (feature == FeatureType.CHINA_HAT) return new String[]{"Cone", "Flat", "Wide"};
-        if (feature == FeatureType.HIT_EFFECT) return new String[]{"Slash", "Stars", "Crit"};
+        if (feature == FeatureType.CHINA_HAT)    return new String[]{"Cone", "Flat", "Wide"};
+        if (feature == FeatureType.HIT_EFFECT)   return com.example.cosmetics.hit.HitEffectHandler.STYLE_NAMES;
+        if (feature == FeatureType.COSMETICS_HUD) return com.example.cosmetics.hud.CosmeticsHud.STYLE_NAMES;
+        if (feature == FeatureType.TARGET_HUD)   return com.example.cosmetics.hud.TargetHud.STYLE_NAMES;
+        if (feature == FeatureType.DRAGON_WINGS) return new String[]{"Dragon", "Angel", "Spirit"};
+        if (feature == FeatureType.RAINBOW_TRAIL
+         || feature == FeatureType.FLAME_TRAIL
+         || feature == FeatureType.GALAXY_TRAIL) return new String[]{"Ribbon", "Blade", "Double"};
         return new String[]{"Style 0", "Style 1", "Style 2"};
     }
 

@@ -17,13 +17,26 @@ public final class ModRenderTypes extends RenderType {
         super(n, fmt, mode, bufSize, delegate, sorted, on, off);
     }
 
-    /** Untextured translucent colored quads (for the hat). */
+    /** Untextured translucent colored quads (for the hat, wings, trails). */
     public static final RenderType COLOR_QUADS = create(
             "cosmeticsmod_color_quads",
             DefaultVertexFormats.POSITION_COLOR,
-            GL11.GL_QUADS, 256, false, true,
+            GL11.GL_QUADS, 1024, false, true,
             RenderType.State.builder()
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setCullState(NO_CULL)
+                    .setLightmapState(NO_LIGHTMAP)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .createCompositeState(false)
+    );
+
+    /** Additive-blend translucent colored quads (for glowing trails/wings). */
+    public static final RenderType GLOW_QUADS = create(
+            "cosmeticsmod_glow_quads",
+            DefaultVertexFormats.POSITION_COLOR,
+            GL11.GL_QUADS, 1024, false, true,
+            RenderType.State.builder()
+                    .setTransparencyState(LIGHTNING_TRANSPARENCY) // additive
                     .setCullState(NO_CULL)
                     .setLightmapState(NO_LIGHTMAP)
                     .setWriteMaskState(COLOR_WRITE)

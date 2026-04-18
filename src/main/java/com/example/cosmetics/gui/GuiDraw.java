@@ -13,7 +13,13 @@ public final class GuiDraw extends AbstractGui {
 
     /** Dark gradient panel with layered glow border and rounded corners. */
     public static void roundedPanel(MatrixStack ms, int x, int y, int w, int h, float alpha) {
-        I.drawRoundedPanel(ms, x, y, w, h, alpha);
+        I.drawRoundedPanel(ms, x, y, w, h, alpha, 0x171325, 0x0D0B1A, 0x8A5CFF);
+    }
+
+    /** Same as {@link #roundedPanel} but with explicit top, bottom and accent colors. */
+    public static void themedPanel(MatrixStack ms, int x, int y, int w, int h, float alpha,
+                                    int topRgb, int bottomRgb, int accentRgb) {
+        I.drawRoundedPanel(ms, x, y, w, h, alpha, topRgb, bottomRgb, accentRgb);
     }
 
     /** Horizontal gradient bar — useful for HP or progress. */
@@ -24,16 +30,17 @@ public final class GuiDraw extends AbstractGui {
         I.fillGradient(ms, x, y, x + w, y + h, aL, aR);
     }
 
-    private void drawRoundedPanel(MatrixStack ms, int x, int y, int w, int h, float alpha) {
-        // Outer glow rings
+    private void drawRoundedPanel(MatrixStack ms, int x, int y, int w, int h, float alpha,
+                                   int topRgb, int bottomRgb, int accentRgb) {
+        // Outer glow rings (use accent color)
         for (int i = 5; i >= 1; i--) {
             int glowA = clamp((int)(alpha * (35 - i * 6)));
-            fill(ms, x - i, y - i, x + w + i, y + h + i, (glowA << 24) | 0x7A4CFF);
+            fill(ms, x - i, y - i, x + w + i, y + h + i, (glowA << 24) | (accentRgb & 0xFFFFFF));
         }
 
         int a   = clamp((int)(alpha * 255));
-        int top = (a << 24) | 0x171325;
-        int bot = (a << 24) | 0x0D0B1A;
+        int top = (a << 24) | (topRgb    & 0xFFFFFF);
+        int bot = (a << 24) | (bottomRgb & 0xFFFFFF);
 
         // Rounded corner trim (2px cut)
         fillGradient(ms, x + 2, y,         x + w - 2, y + 2,         top, top);
@@ -44,7 +51,7 @@ public final class GuiDraw extends AbstractGui {
         fillGradient(ms, x + 2, y + 2,     x + w - 2, y + h - 2,     top, bot);
 
         // Inner border (subtle glow line)
-        int bdr = (clamp((int)(alpha * 110)) << 24) | 0x8A5CFF;
+        int bdr = (clamp((int)(alpha * 110)) << 24) | (accentRgb & 0xFFFFFF);
         fill(ms, x + 1, y + 1,         x + w - 1, y + 2,         bdr);
         fill(ms, x + 1, y + h - 2,     x + w - 1, y + h - 1,     bdr);
         fill(ms, x + 1, y + 2,         x + 2,     y + h - 2,     bdr);
