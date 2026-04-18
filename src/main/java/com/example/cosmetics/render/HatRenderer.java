@@ -28,6 +28,10 @@ public final class HatRenderer {
         ClientPlayerEntity player = mc.player;
         if (player == null) return;
 
+        // Hide the hat in first-person so it does not block the view.
+        // mc.options.thirdPersonView: 0 = first-person, 1 = back, 2 = front.
+        if (mc.options.thirdPersonView == 0) return;
+
         FeatureSettings fs = state.settings(FeatureType.CHINA_HAT);
 
         // Smooth interpolated player position
