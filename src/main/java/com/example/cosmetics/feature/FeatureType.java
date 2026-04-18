@@ -36,9 +36,17 @@ public enum FeatureType {
     // View model / animations
     VIEW_MODEL       ("View Model",          Category.ANIM, Caps.OFFSET | Caps.ROTATION),
     CUSTOM_ATTACK    ("Custom Attack Anim",  Category.ANIM, Caps.SIZE),
-    CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE);
+    CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE),
 
-    public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM }
+    // Utility — no visual, pure gameplay helpers
+    AUTO_SPRINT  ("Auto Sprint",    Category.UTILITY, 0),
+    AUTO_JUMP    ("Auto Jump",      Category.UTILITY, 0),
+    AUTO_SNEAK   ("Auto Sneak",     Category.UTILITY, 0),
+    FULLBRIGHT   ("Fullbright",     Category.UTILITY, 0),
+    NO_FALL      ("No Fall Damage", Category.UTILITY, 0),
+    STEP_ASSIST  ("Step Assist",    Category.UTILITY, Caps.SIZE);
+
+    public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
     /** Bitmask of which settings fields this feature uses. */
     public static final class Caps {

@@ -13,6 +13,7 @@ import com.example.cosmetics.render.HatRenderer;
 import com.example.cosmetics.render.TrailRenderer;
 import com.example.cosmetics.render.WingsRenderer;
 import com.example.cosmetics.trails.TrailTicker;
+import com.example.cosmetics.utility.UtilityHandler;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.BlockItem;
@@ -64,6 +65,7 @@ public final class ClientEvents {
         HandRenderer.tickPlaceAnim();
         JumpCircles.get().tick();
         detectJumpAndLanding(mc.player);
+        UtilityHandler.get().tick();
     }
 
     private static void detectJumpAndLanding(ClientPlayerEntity player) {

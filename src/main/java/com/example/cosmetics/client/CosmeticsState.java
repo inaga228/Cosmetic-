@@ -65,6 +65,9 @@ public final class CosmeticsState {
             case COSMETICS_HUD: s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
             case TARGET_HUD:    s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;
 
+            // Utility
+            case STEP_ASSIST:   s.size = 1.0F; break; // 1.0 = walk up 1-block steps
+
             default: break;
         }
     }
