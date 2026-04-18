@@ -39,8 +39,8 @@ public final class ParticleManager {
     public void renderAll(MatrixStack ms, float partialTicks) {
         if (particles.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
-        Vector3d cam = mc.gameRenderer.getCamera().getPosition();
-        IRenderTypeBuffer.Impl buf = mc.getRenderTypeBuffers().getBufferSource();
+        Vector3d cam = mc.gameRenderer.getMainCamera().getPosition();
+        IRenderTypeBuffer.Impl buf = mc.renderBuffers().bufferSource();
 
         for (CustomParticle p : particles) {
             ms.pushPose();

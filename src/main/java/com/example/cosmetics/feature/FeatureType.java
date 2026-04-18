@@ -15,6 +15,10 @@ public enum FeatureType {
     SNOW_AURA   ("Snow Aura",       Category.PARTICLES, Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED),
     HEART_AURA  ("Hearts",          Category.PARTICLES, Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED),
 
+    // Movement / motion effects
+    JUMP_CIRCLES  ("Jump Circles",   Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE),
+    LANDING_RING  ("Landing Ring",   Category.EFFECTS, Caps.COLOR | Caps.SIZE),
+
     // Hat
     CHINA_HAT   ("China Hat",       Category.HAT,     Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.OFFSET),
 
@@ -24,13 +28,14 @@ public enum FeatureType {
     // HUDs
     COSMETICS_HUD ("Cosmetics HUD", Category.HUD,     Caps.COLOR),
     TARGET_HUD    ("Target HUD",    Category.HUD,     Caps.COLOR),
+    WATERMARK     ("Watermark",     Category.HUD,     Caps.COLOR | Caps.STYLE),
 
     // View model / animations
     VIEW_MODEL       ("View Model",          Category.ANIM, Caps.OFFSET | Caps.ROTATION),
     CUSTOM_ATTACK    ("Custom Attack Anim",  Category.ANIM, Caps.SIZE),
     CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE);
 
-    public enum Category { TRAILS, PARTICLES, HAT, COMBAT, HUD, ANIM }
+    public enum Category { TRAILS, PARTICLES, EFFECTS, HAT, COMBAT, HUD, ANIM }
 
     /** Bitmask of which settings fields this feature uses. */
     public static final class Caps {

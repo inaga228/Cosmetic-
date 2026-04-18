@@ -26,9 +26,11 @@ public final class CosmeticsState {
             applyDefaults(f, s);
             settings.put(f, s);
         }
-        // Turn the HUD on by default so users see something immediately.
+        // Turn the HUD + watermark on by default so users see something immediately.
         enabled.add(FeatureType.COSMETICS_HUD);
         enabled.add(FeatureType.TARGET_HUD);
+        enabled.add(FeatureType.WATERMARK);
+        enabled.add(FeatureType.JUMP_CIRCLES);
     }
 
     private static void applyDefaults(FeatureType f, FeatureSettings s) {
@@ -42,6 +44,9 @@ public final class CosmeticsState {
             case CHINA_HAT:     s.colorR = 0.85F; s.colorG = 0.2F; s.colorB = 0.25F;
                                 s.offsetY = 0.0F; s.size = 1.0F; break;
             case HIT_EFFECT:    s.colorR = 1.0F; s.colorG = 0.2F; s.colorB = 0.2F; s.count = 8; break;
+            case JUMP_CIRCLES:  s.colorR = 0.55F; s.colorG = 0.35F; s.colorB = 1.0F; s.size = 1.0F; s.style = 0; break;
+            case LANDING_RING:  s.colorR = 1.0F;  s.colorG = 0.8F;  s.colorB = 0.3F; s.size = 1.0F; break;
+            case WATERMARK:     s.colorR = 0.55F; s.colorG = 0.35F; s.colorB = 1.0F; s.style = 0; break;
             default: break;
         }
     }

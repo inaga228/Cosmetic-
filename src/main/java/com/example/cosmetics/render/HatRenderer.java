@@ -35,7 +35,7 @@ public final class HatRenderer {
         double py = player.yo + (player.getY() - player.yo) * partialTicks;
         double pz = player.zo + (player.getZ() - player.zo) * partialTicks;
 
-        Vector3d cam = mc.gameRenderer.getCamera().getPosition();
+        Vector3d cam = mc.gameRenderer.getMainCamera().getPosition();
 
         double eye = player.getEyeHeight();
         double dx = px - cam.x + fs.offsetX;
@@ -57,7 +57,7 @@ public final class HatRenderer {
         int b = clamp((int)(fs.colorB * 255));
         int a = 150; // semi-transparent
 
-        IRenderTypeBuffer.Impl buf = mc.getRenderTypeBuffers().getBufferSource();
+        IRenderTypeBuffer.Impl buf = mc.renderBuffers().bufferSource();
         IVertexBuilder vb = buf.getBuffer(ModRenderTypes.COLOR_QUADS);
 
         float radius, height;

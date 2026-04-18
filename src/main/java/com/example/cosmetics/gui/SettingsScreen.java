@@ -124,8 +124,10 @@ public class SettingsScreen extends Screen {
     }
 
     private String[] getStyleLabels() {
-        if (feature == FeatureType.CHINA_HAT) return new String[]{"Cone", "Flat", "Wide"};
-        if (feature == FeatureType.HIT_EFFECT) return new String[]{"Slash", "Stars", "Crit"};
+        if (feature == FeatureType.CHINA_HAT)     return new String[]{"Cone", "Flat", "Wide"};
+        if (feature == FeatureType.HIT_EFFECT)    return new String[]{"Slash", "Stars", "Crit"};
+        if (feature == FeatureType.JUMP_CIRCLES)  return new String[]{"Solid", "Double", "Rainbow"};
+        if (feature == FeatureType.WATERMARK)     return new String[]{"Rainbow", "Pulse", "Minimal"};
         return new String[]{"Style 0", "Style 1", "Style 2"};
     }
 
