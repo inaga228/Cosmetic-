@@ -14,6 +14,7 @@ import java.util.List;
 
 public final class CosmeticsHud {
     private static float shownAlpha = 0.0F;
+    private static long lastTick = 0;
 
     public static void render(MatrixStack ms, float partialTicks) {
         Minecraft mc = Minecraft.getInstance();
@@ -22,7 +23,7 @@ public final class CosmeticsHud {
         CosmeticsState s = CosmeticsState.get();
         boolean want = s.isOn(FeatureType.COSMETICS_HUD);
         float target = want ? 1.0F : 0.0F;
-        shownAlpha += (target - shownAlpha) * 0.15F;
+        shownAlpha += (target - shownAlpha) * 0.12F;
         if (shownAlpha < 0.01F) return;
 
         PlayerEntity p = mc.player;
@@ -31,31 +32,39 @@ public final class CosmeticsHud {
         List<String> lines = new ArrayList<>();
         for (FeatureType ft : s.active()) {
             if (ft == FeatureType.COSMETICS_HUD) continue;
-            lines.add("- " + ft.displayName);
+            if (ft == FeatureType.TARGET_HUD) continue;
+            lines.add(ft.displayName);
         }
-        if (lines.isEmpty()) lines.add("No effects active");
 
-        int padding = 6;
-        int lineH = 10;
-        int w = Math.max(120, f.width(p.getGameProfile().getName()) + 40);
-        for (String l : lines) w = Math.max(w, f.width(l) + padding * 2 + 6);
-        int h = padding + 12 + 4 + lines.size() * lineH + padding;
+        int padding = 7;
+        int lineH = 11;
+        String playerName = p.getGameProfile().getName();
+        int w = Math.max(130, f.width(playerName) + 44);
+        for (String l : lines) w = Math.max(w, f.width("• " + l) + padding * 2 + 6);
+        int h = padding + 12 + 5 + lines.size() * lineH + padding;
+        if (lines.isEmpty()) h = padding + 12 + 5 + lineH + padding;
 
         int x = 8, y = 8;
         GuiDraw.roundedPanel(ms, x, y, w, h, shownAlpha);
 
-        int a = Math.max(0, Math.min(255, (int) (shownAlpha * 255)));
+        int a = Math.max(0, Math.min(255, (int)(shownAlpha * 255)));
         int nameCol = (a << 24) | 0xFFFFFF;
-        int subCol  = (a << 24) | 0xB8A8FF;
+        int dotCol  = (a << 24) | 0x9B6DFF;
+        int lineCol = (a << 24) | 0xCCBBFF;
+        int divCol  = (Math.max(0, Math.min(255, (int)(shownAlpha * 100))) << 24) | 0x8A5CFF;
 
-        f.drawShadow(ms, p.getGameProfile().getName(), x + padding, y + padding, nameCol);
-        int divCol = (Math.max(0, Math.min(255, (int)(shownAlpha * 120))) << 24) | 0x8A5CFF;
-        AbstractGui.fill(ms, x + padding, y + padding + 10, x + w - padding, y + padding + 11, divCol);
+        f.drawShadow(ms, playerName, x + padding, y + padding, nameCol);
+        AbstractGui.fill(ms, x + padding, y + padding + 11, x + w - padding, y + padding + 12, divCol);
 
-        int ly = y + padding + 14;
-        for (String l : lines) {
-            f.drawShadow(ms, l, x + padding, ly, subCol);
-            ly += lineH;
+        int ly = y + padding + 15;
+        if (lines.isEmpty()) {
+            f.drawShadow(ms, "No effects active", x + padding, ly, (a << 24) | 0x777777);
+        } else {
+            for (String l : lines) {
+                f.drawShadow(ms, "•", x + padding, ly, dotCol);
+                f.drawShadow(ms, l, x + padding + 8, ly, lineCol);
+                ly += lineH;
+            }
         }
     }
 
