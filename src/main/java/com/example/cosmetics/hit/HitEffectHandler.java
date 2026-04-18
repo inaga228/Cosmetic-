@@ -21,12 +21,12 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.Random;
 
 /**
- * When the local player attacks another entity, spawn a burst of client-side
- * custom particles at the target's hit location based on the selected style.
+ * Spawns hit effect particles when the local player attacks an entity.
  *
- * We subscribe to both {@link AttackEntityEvent} (fires client-side when the
- * local player swings) and {@link LivingHurtEvent} (usually server-side, but
- * handled defensively by checking world side) so the effect is responsive.
+ * Styles:
+ *   0 = SLASH  — red diagonal lines burst outward
+ *   1 = STARS  — yellow 3D star burst
+ *   2 = CRIT   — golden sparks with gravity + outward velocity
  */
 @Mod.EventBusSubscriber(modid = CosmeticsMod.MOD_ID, value = Dist.CLIENT)
 public final class HitEffectHandler {
@@ -44,12 +44,10 @@ public final class HitEffectHandler {
 
     @SubscribeEvent
     public static void onHurt(LivingHurtEvent event) {
-        // Only react client-side when the hurt entity is in the client world.
         LivingEntity ent = event.getEntityLiving();
         if (ent == null || ent.level == null || !ent.level.isClientSide) return;
-        // Avoid double-bursting when AttackEntityEvent already fired from local player
-        // by only triggering for remote-caused hurt:
-        if (event.getSource() != null && event.getSource().getEntity() == Minecraft.getInstance().player) return;
+        if (event.getSource() != null
+                && event.getSource().getEntity() == Minecraft.getInstance().player) return;
         burst(ent);
     }
 
@@ -66,40 +64,61 @@ public final class HitEffectHandler {
         double cy = target.getY() + target.getBbHeight() * 0.6;
         double cz = target.getZ();
 
+        boolean customColor = fs.colorR != 1.0F || fs.colorG != 1.0F || fs.colorB != 1.0F;
+
         for (int i = 0; i < count; i++) {
-            double vx = (RNG.nextDouble() - 0.5) * 0.15;
-            double vy = (RNG.nextDouble() - 0.5) * 0.15;
-            double vz = (RNG.nextDouble() - 0.5) * 0.15;
-            double px = cx + (RNG.nextDouble() - 0.5) * 0.4;
-            double py = cy + (RNG.nextDouble() - 0.5) * 0.4;
-            double pz = cz + (RNG.nextDouble() - 0.5) * 0.4;
+            // Outward burst velocity (explode from center)
+            double angle = RNG.nextDouble() * Math.PI * 2;
+            double upward = RNG.nextDouble() * 0.12;
+            double speed = 0.08 + RNG.nextDouble() * 0.10;
+            double vx = Math.cos(angle) * speed;
+            double vy = upward;
+            double vz = Math.sin(angle) * speed;
+
+            double px = cx + (RNG.nextDouble() - 0.5) * 0.3;
+            double py = cy + (RNG.nextDouble() - 0.5) * 0.3;
+            double pz = cz + (RNG.nextDouble() - 0.5) * 0.3;
 
             CustomParticle p;
+            int[] defaultRgb;
+
             switch (style) {
-                case SLASH: p = new SlashParticle(px, py, pz, vx, vy, vz); break;
-                case STARS: p = new StarParticle(px, py, pz, vx, vy, vz); break;
+                case SLASH:
+                    p = new SlashParticle(px, py, pz, vx * 0.4, vy, vz * 0.4);
+                    p.maxAge = 12;
+                    defaultRgb = new int[]{ 255, 35, 35 };
+                    break;
+                case STARS:
+                    p = new StarParticle(px, py, pz, vx, vy, vz);
+                    p.maxAge = 22;
+                    defaultRgb = new int[]{ 255, 235, 60 };
+                    break;
                 case CRIT:
-                default:    p = new CritParticle(px, py, pz, vx, vy, vz); break;
+                default:
+                    CritParticle cp = new CritParticle(px, py, pz, vx, vy, vz);
+                    p = cp;
+                    p.maxAge = 18;
+                    defaultRgb = new int[]{ 255, 195, 30 };
+                    break;
             }
 
-            // Defaults per style; user color overrides if set far from defaults.
-            int[] rgb;
-            switch (style) {
-                case SLASH: rgb = new int[]{ 255, 40, 40 }; break;
-                case STARS: rgb = new int[]{ 255, 240, 120 }; break;
-                case CRIT:
-                default:    rgb = new int[]{ 255, 200, 40 }; break;
+            if (customColor) {
+                p.r = clamp((int)(fs.colorR * 255));
+                p.g = clamp((int)(fs.colorG * 255));
+                p.b = clamp((int)(fs.colorB * 255));
+            } else {
+                // Slight random variation on default color for more life
+                p.r = clamp(defaultRgb[0] + RNG.nextInt(20) - 10);
+                p.g = clamp(defaultRgb[1] + RNG.nextInt(20) - 10);
+                p.b = clamp(defaultRgb[2] + RNG.nextInt(20) - 10);
             }
-            if (fs.colorR != 1.0F || fs.colorG != 1.0F || fs.colorB != 1.0F) {
-                rgb[0] = (int) (fs.colorR * 255);
-                rgb[1] = (int) (fs.colorG * 255);
-                rgb[2] = (int) (fs.colorB * 255);
-            }
-            p.r = rgb[0]; p.g = rgb[1]; p.b = rgb[2];
-            p.size = 0.5F * fs.size;
+
+            p.size = 0.45F * fs.size;
             ParticleManager.get().add(p);
         }
     }
+
+    private static int clamp(int v) { return Math.max(0, Math.min(255, v)); }
 
     private HitEffectHandler() {}
 }

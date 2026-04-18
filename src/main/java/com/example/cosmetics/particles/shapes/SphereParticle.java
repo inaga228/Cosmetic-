@@ -6,11 +6,14 @@ import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.vertex.IVertexBuilder;
 import net.minecraft.client.renderer.IRenderTypeBuffer;
 
+/** 3D sphere with dual-axis spin. */
 public class SphereParticle extends CustomParticle {
     public SphereParticle(double x, double y, double z, double vx, double vy, double vz) {
         super(x, y, z, vx, vy, vz);
-        this.rotationSpeed = 4.0F;
-        this.maxAge = 35;
+        this.rotationSpeed = 5.0F;
+        this.rotSpeedX     = 3.0F;
+        this.drag          = 0.97F;
+        this.maxAge        = 12;
     }
 
     @Override

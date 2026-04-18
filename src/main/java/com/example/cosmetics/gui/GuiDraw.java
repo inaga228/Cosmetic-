@@ -4,49 +4,56 @@ import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.gui.AbstractGui;
 
 /**
- * Small helper utilities for the custom GUI. Approximates rounded corners by
- * inset rectangles (cheap and works without shaders), and draws a glowing
- * border by layering increasingly translucent outlines.
- *
- * Implemented as a subclass-singleton because {@link AbstractGui#fillGradient}
- * is a protected, non-static method on 1.16.5 and can only be called on a
- * subclass instance.
+ * GUI drawing utilities — rounded panel with glow border and gradient body.
+ * Also provides a simple static helper for drawing horizontal gradient bars.
  */
 public final class GuiDraw extends AbstractGui {
 
     private static final GuiDraw I = new GuiDraw();
 
-    /** Draws a dark gradient panel with glowing rounded-looking border. */
+    /** Dark gradient panel with layered glow border and rounded corners. */
     public static void roundedPanel(MatrixStack ms, int x, int y, int w, int h, float alpha) {
         I.drawRoundedPanel(ms, x, y, w, h, alpha);
     }
 
+    /** Horizontal gradient bar — useful for HP or progress. */
+    public static void gradientBar(MatrixStack ms, int x, int y, int w, int h,
+                                   int colorLeft, int colorRight, float alpha) {
+        int aL = withAlpha(colorLeft,  alpha);
+        int aR = withAlpha(colorRight, alpha);
+        I.fillGradient(ms, x, y, x + w, y + h, aL, aR);
+    }
+
     private void drawRoundedPanel(MatrixStack ms, int x, int y, int w, int h, float alpha) {
-        // Outer glow (several translucent outlines, fading out).
-        for (int i = 4; i >= 1; i--) {
-            int glowA = clamp((int) (alpha * (40 - i * 8)));
-            int glow  = (glowA << 24) | 0x8A5CFF;
-            fill(ms, x - i, y - i, x + w + i, y + h + i, glow);
+        // Outer glow rings
+        for (int i = 5; i >= 1; i--) {
+            int glowA = clamp((int)(alpha * (35 - i * 6)));
+            fill(ms, x - i, y - i, x + w + i, y + h + i, (glowA << 24) | 0x7A4CFF);
         }
 
-        int a = clamp((int) (alpha * 255));
-        int topCol    = (a << 24) | 0x171322;
-        int bottomCol = (a << 24) | 0x0C0A16;
+        int a   = clamp((int)(alpha * 255));
+        int top = (a << 24) | 0x171325;
+        int bot = (a << 24) | 0x0D0B1A;
 
-        // Rounded-corner approximation: main rect + trimmed corners.
-        fillGradient(ms, x + 2, y,         x + w - 2, y + 2,     topCol, topCol);
-        fillGradient(ms, x + 2, y + h - 2, x + w - 2, y + h,     bottomCol, bottomCol);
-        fillGradient(ms, x,     y + 2,     x + 2,     y + h - 2, topCol, bottomCol);
-        fillGradient(ms, x + w - 2, y + 2, x + w,     y + h - 2, topCol, bottomCol);
-        // Center gradient body
-        fillGradient(ms, x + 2, y + 2,     x + w - 2, y + h - 2, topCol, bottomCol);
+        // Rounded corner trim (2px cut)
+        fillGradient(ms, x + 2, y,         x + w - 2, y + 2,         top, top);
+        fillGradient(ms, x + 2, y + h - 2, x + w - 2, y + h,         bot, bot);
+        fillGradient(ms, x,     y + 2,     x + 2,     y + h - 2,     top, bot);
+        fillGradient(ms, x + w - 2, y + 2, x + w,     y + h - 2,     top, bot);
+        // Main body
+        fillGradient(ms, x + 2, y + 2,     x + w - 2, y + h - 2,     top, bot);
 
-        // Inner subtle 1px border
-        int border = (clamp((int) (alpha * 120)) << 24) | 0x8A5CFF;
-        fill(ms, x + 1, y + 1,         x + w - 1, y + 2,     border);
-        fill(ms, x + 1, y + h - 2,     x + w - 1, y + h - 1, border);
-        fill(ms, x + 1, y + 2,         x + 2,     y + h - 2, border);
-        fill(ms, x + w - 2, y + 2,     x + w - 1, y + h - 2, border);
+        // Inner border (subtle glow line)
+        int bdr = (clamp((int)(alpha * 110)) << 24) | 0x8A5CFF;
+        fill(ms, x + 1, y + 1,         x + w - 1, y + 2,         bdr);
+        fill(ms, x + 1, y + h - 2,     x + w - 1, y + h - 1,     bdr);
+        fill(ms, x + 1, y + 2,         x + 2,     y + h - 2,     bdr);
+        fill(ms, x + w - 2, y + 2,     x + w - 1, y + h - 2,     bdr);
+    }
+
+    private static int withAlpha(int rgb, float alpha) {
+        int a = clamp((int)(alpha * 255));
+        return (a << 24) | (rgb & 0x00FFFFFF);
     }
 
     private static int clamp(int v) { return Math.max(0, Math.min(255, v)); }

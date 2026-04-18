@@ -6,14 +6,17 @@ import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.vertex.IVertexBuilder;
 import net.minecraft.client.renderer.IRenderTypeBuffer;
 
+/** 3D tetrahedron — used for flame trail. Rises and spins rapidly. */
 public class TetraParticle extends CustomParticle {
     public TetraParticle(double x, double y, double z, double vx, double vy, double vz) {
         super(x, y, z, vx, vy, vz);
-        this.rotationSpeed = 9.0F;
-        this.maxAge = 24;
+        this.rotationSpeed = 11.0F;
+        this.rotSpeedX     = 7.0F;
+        this.drag          = 0.93F;
+        this.maxAge        = 16 + (int)(Math.random() * 10);
     }
 
-    @Override protected double gravity() { return 0.006; }  // fire rises gently (positive = up in world tick model here)
+    @Override protected double gravity() { return 0.005; } // rises (flame)
 
     @Override
     protected void renderShape(MatrixStack ms, IRenderTypeBuffer buf, int alpha) {
