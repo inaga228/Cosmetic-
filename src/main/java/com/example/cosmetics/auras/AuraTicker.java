@@ -13,11 +13,11 @@ import net.minecraft.entity.player.PlayerEntity;
 import java.util.Random;
 
 /**
- * Aura ticker — spawns orbital / rain particles around the local player.
+ * Aura ticker - spawns orbital / rain particles around the local player.
  *
- * AURA      — сферы вращаются по нескольким орбитам
- * SNOW_AURA — снежинки падают сверху в конусе вокруг игрока
- * HEART_AURA — сердечки пульсируют на орбите
+ * AURA      - spheres orbit on multiple rings
+ * SNOW_AURA - snowflakes fall from above in a cone around the player
+ * HEART_AURA - hearts pulse on orbit
  */
 public final class AuraTicker {
     private static final Random RNG = new Random();
