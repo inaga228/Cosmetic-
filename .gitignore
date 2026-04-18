@@ -1,0 +1,24 @@
+# Eclipse
+*.launch
+
+# IntelliJ
+out/
+*.ipr
+*.iws
+*.iml
+.idea/
+
+# Gradle
+build/
+.gradle/
+
+# Forge / FG
+run/
+runs/
+logs/
+
+# OS
+.DS_Store
+
+# Misc
+bin/
