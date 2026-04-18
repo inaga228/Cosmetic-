@@ -4,7 +4,6 @@ import com.example.cosmetics.client.ClientEvents;
 import com.example.cosmetics.particles.ModParticles;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -23,7 +22,6 @@ public class CosmeticsMod {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
             modBus.addListener(ClientEvents::onClientSetup);
             modBus.addListener(ClientEvents::onParticleFactoryRegister);
-            modBus.addListener(ClientEvents::onAddLayers);
         });
     }
 }

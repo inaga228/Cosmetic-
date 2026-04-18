@@ -9,15 +9,17 @@ import com.example.cosmetics.particles.factories.GenericSpriteParticleFactory;
 import com.example.cosmetics.render.HatLayer;
 import com.example.cosmetics.trails.TrailTicker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.EntityRendererManager;
 import net.minecraft.client.renderer.entity.PlayerRenderer;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.ParticleFactoryRegisterEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+
+import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = CosmeticsMod.MOD_ID, value = Dist.CLIENT)
 public final class ClientEvents {
@@ -26,25 +28,25 @@ public final class ClientEvents {
 
     public static void onClientSetup(FMLClientSetupEvent event) {
         KeyBindings.register();
+
+        // Install HatLayer on both player renderers. Must run on the client
+        // thread because it touches Minecraft's render manager.
+        event.enqueueWork(() -> {
+            EntityRendererManager mgr = Minecraft.getInstance().getEntityRenderDispatcher();
+            Map<String, PlayerRenderer> skins = mgr.getSkinMap();
+            for (PlayerRenderer r : skins.values()) {
+                r.addLayer(new HatLayer(r));
+            }
+        });
     }
 
     public static void onParticleFactoryRegister(ParticleFactoryRegisterEvent event) {
         Minecraft.getInstance().particleEngine.register(ModParticles.RAINBOW.get(), GenericSpriteParticleFactory::new);
         Minecraft.getInstance().particleEngine.register(ModParticles.FLAME.get(),   GenericSpriteParticleFactory::new);
-        Minecraft.getInstance().particleEngine.register(ModParticles.GALAXY.get(), GenericSpriteParticleFactory::new);
-        Minecraft.getInstance().particleEngine.register(ModParticles.AURA.get(),   GenericSpriteParticleFactory::new);
-        Minecraft.getInstance().particleEngine.register(ModParticles.SNOW.get(),   GenericSpriteParticleFactory::new);
-        Minecraft.getInstance().particleEngine.register(ModParticles.HEART.get(),  GenericSpriteParticleFactory::new);
-    }
-
-    public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
-        // Add the China Hat layer to both player skin models.
-        for (String skin : event.getSkins()) {
-            PlayerRenderer renderer = event.getSkin(skin);
-            if (renderer != null) {
-                renderer.addLayer(new HatLayer(renderer));
-            }
-        }
+        Minecraft.getInstance().particleEngine.register(ModParticles.GALAXY.get(),  GenericSpriteParticleFactory::new);
+        Minecraft.getInstance().particleEngine.register(ModParticles.AURA.get(),    GenericSpriteParticleFactory::new);
+        Minecraft.getInstance().particleEngine.register(ModParticles.SNOW.get(),    GenericSpriteParticleFactory::new);
+        Minecraft.getInstance().particleEngine.register(ModParticles.HEART.get(),   GenericSpriteParticleFactory::new);
     }
 
     // ---- Forge event bus listeners (auto-registered via @EventBusSubscriber) ----
