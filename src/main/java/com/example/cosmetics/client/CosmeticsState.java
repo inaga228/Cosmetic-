@@ -68,6 +68,8 @@ public final class CosmeticsState {
             // Utility
             // AUTO_TOTEM: count = HP threshold in hearts (default 6 hearts = 12 HP)
             case AUTO_TOTEM:    s.count = 6; break;
+            // FAST_PLACE: speed = interval in ticks (1 = max, default 4 = fast)
+            case FAST_PLACE:    s.speed = 4F; break;
 
             default: break;
         }

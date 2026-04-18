@@ -38,25 +38,27 @@ public enum FeatureType {
     CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE),
 
     // Utility — no visual, pure gameplay helpers
-    // COUNT field = HP threshold (hearts) for AUTO_TOTEM
     AUTO_SPRINT  ("Auto Sprint",    Category.UTILITY, 0),
     AUTO_JUMP    ("Auto Jump",      Category.UTILITY, 0),
     AUTO_SNEAK   ("Auto Sneak",     Category.UTILITY, 0),
     FULLBRIGHT   ("Fullbright",     Category.UTILITY, 0),
-    AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT);
+    AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT),
+    // PLACE_SPEED cap: speed field used as interval in ticks (1 = every tick = max)
+    FAST_PLACE   ("Fast Place",     Category.UTILITY, Caps.PLACE_SPEED);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
     /** Bitmask of which settings fields this feature uses. */
     public static final class Caps {
-        public static final int COLOR    = 1 << 0;
-        public static final int SIZE     = 1 << 1;
-        public static final int DENSITY  = 1 << 2;
-        public static final int SPEED    = 1 << 3;
-        public static final int STYLE    = 1 << 4;
-        public static final int COUNT    = 1 << 5;
-        public static final int OFFSET   = 1 << 6;
-        public static final int ROTATION = 1 << 7;
+        public static final int COLOR       = 1 << 0;
+        public static final int SIZE        = 1 << 1;
+        public static final int DENSITY     = 1 << 2;
+        public static final int SPEED       = 1 << 3;
+        public static final int STYLE       = 1 << 4;
+        public static final int COUNT       = 1 << 5;
+        public static final int OFFSET      = 1 << 6;
+        public static final int ROTATION    = 1 << 7;
+        public static final int PLACE_SPEED = 1 << 8; // Fast Place interval: 1..20 ticks
     }
 
     public final String displayName;
