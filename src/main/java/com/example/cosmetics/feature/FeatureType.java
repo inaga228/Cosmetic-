@@ -44,11 +44,8 @@ public enum FeatureType {
     FULLBRIGHT   ("Fullbright",     Category.UTILITY, 0),
     // AUTO_TOTEM: count = HP threshold in hearts
     AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT),
-    // FAST_PLACE: count = delay-reset repeats per tick (1 = vanilla fast, 10 = max)
-    FAST_PLACE   ("Fast Place",     Category.UTILITY, Caps.COUNT),
 
     // Combat helpers
-    AUTO_BLOCK      ("Auto Block",       Category.COMBAT, 0),
     NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0),
 
     // Kill Aura: SPEED = attack delay ticks, SIZE = range, STYLE = camera mode, COUNT = sort mode

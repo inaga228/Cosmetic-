@@ -11,7 +11,6 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.ShieldItem;
 import net.minecraft.util.Hand;
 
 import java.util.Comparator;
@@ -65,10 +64,6 @@ public final class CombatHandler {
     // ---- Crit state ------------------------------------------------------------
     private int critJumpedTick = -999; // game tick when micro-jump was issued
 
-    // ---- Auto Block state ------------------------------------------------------
-    private int blockCooldown = 0;
-    private static final int BLOCK_LOWER_TICKS = 6;
-    private static final double BLOCK_RANGE    = 6.0;
 
     // ---- Auto Clicker state ----------------------------------------------------
     private int clickerTick     = 0;
@@ -82,7 +77,6 @@ public final class CombatHandler {
         if (mc.level == null || mc.player == null) return;
         ClientPlayerEntity player = mc.player;
 
-        tickAutoBlock(mc, player);
         tickNoFireOverlay(player);
         tickKillAura(mc, player);
         tickAutoClicker(mc, player);
@@ -168,7 +162,7 @@ public final class CombatHandler {
             boolean canCrit = player.isOnGround()
                     && !player.isCrouching()
                     && !player.isInWater()
-                    && !player.isOnLadder()
+                    && !player.onClimbable()
                     && !player.isSprinting();
             if (canCrit) {
                 int currentTick = (int)(mc.level.getGameTime() & 0x7FFFFFFF);
@@ -271,7 +265,7 @@ public final class CombatHandler {
         if (!CosmeticsState.get().isOn(FeatureType.CRIT)) return;
         boolean swinging = player.getAttackStrengthScale(0F) < 0.9F;
         if (swinging && player.isOnGround() && !player.isCrouching()
-                && !player.isInWater() && !player.isOnLadder() && !player.isSprinting()) {
+                && !player.isInWater() && !player.onClimbable() && !player.isSprinting()) {
             player.setDeltaMovement(
                     player.getDeltaMovement().x,
                     0.11,
@@ -301,57 +295,6 @@ public final class CombatHandler {
             clickerInterval = Math.max(1, 20 / cps);
             KeyBinding.click(mc.options.keyAttack.getKey());
         }
-    }
-
-    // ============================================================
-    // AUTO BLOCK
-    // ============================================================
-    private void tickAutoBlock(Minecraft mc, ClientPlayerEntity player) {
-        if (!CosmeticsState.get().isOn(FeatureType.AUTO_BLOCK)) {
-            if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
-            blockCooldown = 0;
-            return;
-        }
-        Hand shieldHand = getShieldHand(player);
-        if (shieldHand == null) { blockCooldown = 0; return; }
-
-        boolean justSwung = player.getAttackStrengthScale(0F) < 0.9F && !player.isUsingItem();
-        if (justSwung) blockCooldown = BLOCK_LOWER_TICKS;
-
-        if (blockCooldown > 0) {
-            blockCooldown--;
-            if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
-            return;
-        }
-
-        if (hasEnemyNearby(mc, player)) {
-            if (!player.isUsingItem()) mc.gameMode.useItem(player, mc.level, shieldHand);
-        } else {
-            if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
-        }
-    }
-
-    private static Hand getShieldHand(ClientPlayerEntity player) {
-        if (isShield(player.getItemInHand(Hand.OFF_HAND)))  return Hand.OFF_HAND;
-        if (isShield(player.getItemInHand(Hand.MAIN_HAND))) return Hand.MAIN_HAND;
-        return null;
-    }
-
-    private static boolean isShield(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof ShieldItem;
-    }
-
-    private static boolean hasEnemyNearby(Minecraft mc, ClientPlayerEntity player) {
-        return !mc.level.getEntitiesOfClass(
-                LivingEntity.class,
-                player.getBoundingBox().inflate(BLOCK_RANGE),
-                e -> {
-                    if (e == player || !e.isAlive()) return false;
-                    if (e instanceof PlayerEntity) return true;
-                    MobEntity mob = (e instanceof MobEntity) ? (MobEntity) e : null;
-                    if (mob != null && mob.getTarget() == player) return true;
-                    return e.getType().getCategory() == EntityClassification.MONSTER;
-                }).isEmpty();
     }
 
     public static boolean shouldSuppressFireOverlay() {
