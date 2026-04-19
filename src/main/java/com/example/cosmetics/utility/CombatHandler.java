@@ -37,22 +37,8 @@ public final class CombatHandler {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
         tickAutoBlock(mc, mc.player);
-        tickNoHurtCam(mc.player);
     }
 
-    // -------------------------------------------------------------------------
-    // No Hurt Cam
-    //
-    // Vanilla applies a camera roll/tilt while player.hurtTime > 0.
-    // We simply zero hurtTime every tick when the feature is on — the damage
-    // is already applied, only the visual shake is cancelled.
-    // -------------------------------------------------------------------------
-    private static void tickNoHurtCam(net.minecraft.client.entity.player.ClientPlayerEntity player) {
-        if (!CosmeticsState.get().isOn(FeatureType.NO_HURT_CAM)) return;
-        if (player.hurtTime > 0) {
-            player.hurtTime = 0;
-        }
-    }
 
     // -------------------------------------------------------------------------
     // Auto Block
@@ -144,13 +130,6 @@ public final class CombatHandler {
         return type.getCategory() == net.minecraft.entity.EntityClassification.MONSTER;
     }
 
-    // -------------------------------------------------------------------------
-    // No Hurt Cam — called from RenderGameOverlayEvent or camera event
-    // Returns true if the camera tilt from damage should be suppressed
-    // -------------------------------------------------------------------------
-    public static boolean shouldSuppressHurtCam() {
-        return CosmeticsState.get().isOn(FeatureType.NO_HURT_CAM);
-    }
 
     // -------------------------------------------------------------------------
     // No Fire Overlay — called from RenderGameOverlayEvent.Pre

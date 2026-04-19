@@ -49,7 +49,6 @@ public enum FeatureType {
 
     // Combat helpers
     AUTO_BLOCK      ("Auto Block",       Category.COMBAT, 0),
-    NO_HURT_CAM     ("No Hurt Cam",      Category.COMBAT, 0),
     NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
