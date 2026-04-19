@@ -21,9 +21,6 @@ public enum FeatureType {
     JUMP_CIRCLES  ("Jump Circles",  Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.SPEED),
     LANDING_RING  ("Landing Ring",  Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE),
 
-    // Hit effects
-    HIT_EFFECT  ("Hit Effect",      Category.COMBAT,  Caps.COLOR | Caps.SIZE | Caps.COUNT | Caps.STYLE),
-
     // HUDs
     COSMETICS_HUD ("Cosmetics HUD", Category.HUD,     Caps.COLOR | Caps.STYLE | Caps.BOOL),
     TARGET_HUD    ("Target HUD",    Category.HUD,     Caps.COLOR | Caps.STYLE | Caps.BOOL),
@@ -31,7 +28,7 @@ public enum FeatureType {
     // Animations
     VIEW_MODEL       ("View Model",         Category.ANIM, Caps.OFFSET | Caps.ROTATION),
     CUSTOM_ATTACK    ("Custom Attack Anim", Category.ANIM, Caps.SIZE),
-    CUSTOM_PLACE     ("Custom Place Anim",  Category.ANIM, Caps.SIZE),
+    CUSTOM_PLACE     ("Custom Place Anim",  Category.ANIM, Caps.SIZE | Caps.COUNT),
 
     // Utility
     AUTO_SPRINT  ("Auto Sprint",    Category.UTILITY, 0),
@@ -39,17 +36,18 @@ public enum FeatureType {
     AUTO_SNEAK   ("Auto Sneak",     Category.UTILITY, 0),
     FULLBRIGHT   ("Fullbright",     Category.UTILITY, 0),
     AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT | Caps.BOOL),
+    AUTO_POT     ("Auto Pot",       Category.UTILITY, Caps.COUNT),
+    AUTO_GAP     ("Auto Gap",       Category.UTILITY, Caps.COUNT),
 
     // Combat
     NO_FIRE_OVERLAY ("No Fire Overlay", Category.COMBAT, 0),
-    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SIZE | Caps.BOOL),
+    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SIZE | Caps.BOOL | Caps.KILLAURA),
     CRIT         ("Crit",         Category.COMBAT, 0),
     AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED | Caps.BOOL),
     SMOOTH_AIM   ("Smooth Aim",   Category.COMBAT, Caps.SIZE | Caps.SPEED | Caps.BOOL),
-    STRAFE       ("Strafe",       Category.COMBAT, Caps.SPEED | Caps.BOOL),
+    STRAFE       ("Strafe",       Category.COMBAT, Caps.SPEED | Caps.BOOL | Caps.STRAFE),
     ANTI_BOT     ("Anti Bot",     Category.COMBAT, 0),
-    AUTO_POT     ("Auto Pot",     Category.COMBAT, Caps.COUNT),
-    AUTO_GAP     ("Auto Gap",     Category.COMBAT, Caps.COUNT);
+    HIT_EFFECT   ("Hit Effect",   Category.COMBAT, Caps.COLOR | Caps.SIZE | Caps.COUNT | Caps.STYLE);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
@@ -63,6 +61,8 @@ public enum FeatureType {
         public static final int OFFSET   = 1 << 6;
         public static final int ROTATION = 1 << 7;
         public static final int BOOL     = 1 << 8;
+        public static final int KILLAURA = 1 << 9;  // расширенные настройки KillAura
+        public static final int STRAFE   = 1 << 10; // расширенные настройки Strafe
     }
 
     public final String displayName;

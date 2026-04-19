@@ -34,52 +34,48 @@ public class CycleButton {
     public boolean mousePressed(double mx, double my, int button) {
         if (!contains(mx, my)) return false;
         int cur = Math.floorMod(getter.getAsInt(), options.length);
-        if (button == 0) {
-            // Left click = next
-            setter.accept((cur + 1) % options.length);
-        } else if (button == 1) {
-            // Right click = prev
-            setter.accept((cur - 1 + options.length) % options.length);
-        }
+        if (button == 0) setter.accept((cur + 1) % options.length);
+        else if (button == 1) setter.accept((cur - 1 + options.length) % options.length);
         return true;
     }
 
-    public void draw(MatrixStack ms, float alpha) {
+    public boolean mousePressedAt(double mx, double my, int button, int ox, int oy) {
+        int ax = ox + x, ay = oy + y;
+        if (mx < ax || mx > ax + w || my < ay || my > ay + h) return false;
+        int cur = Math.floorMod(getter.getAsInt(), options.length);
+        if (button == 0) setter.accept((cur + 1) % options.length);
+        else if (button == 1) setter.accept((cur - 1 + options.length) % options.length);
+        return true;
+    }
+
+    public void draw(MatrixStack ms, float alpha) { drawAt(ms, alpha, 0, 0); }
+
+    public void drawAt(MatrixStack ms, float alpha, int ox, int oy) {
         Minecraft mc = Minecraft.getInstance();
+        int ax = ox + x, ay = oy + y;
         int a = clamp((int)(alpha * 255));
         int cur = Math.floorMod(getter.getAsInt(), options.length);
         String curLabel = options[cur];
 
-        // Background
-        AbstractGui.fill(ms, x, y, x + w, y + h, (a << 24) | 0x16132A);
+        AbstractGui.fill(ms, ax, ay, ax + w, ay + h, (a << 24) | 0x16132A);
 
-        // Value box (right portion)
-        int vw = 90;
-        int vx = x + w - vw;
+        int vw = 90, vx = ax + w - vw;
+        AbstractGui.fill(ms, vx, ay, vx + vw, ay + h, (a << 24) | 0x3A1E8A);
+        AbstractGui.fill(ms, vx, ay, vx + 14, ay + h, (a << 24) | 0x4A2EA0);
+        mc.font.drawShadow(ms, "<", vx + 4, ay + (h - 8) / 2, (a << 24) | 0xB090FF);
+        AbstractGui.fill(ms, vx + vw - 14, ay, vx + vw, ay + h, (a << 24) | 0x4A2EA0);
+        mc.font.drawShadow(ms, ">", vx + vw - 10, ay + (h - 8) / 2, (a << 24) | 0xB090FF);
 
-        AbstractGui.fill(ms, vx, y, vx + vw, y + h, (a << 24) | 0x3A1E8A);
-
-        // Left arrow area
-        AbstractGui.fill(ms, vx, y, vx + 14, y + h, (a << 24) | 0x4A2EA0);
-        mc.font.drawShadow(ms, "<", vx + 4, y + (h - 8) / 2, (a << 24) | 0xB090FF);
-
-        // Right arrow area
-        AbstractGui.fill(ms, vx + vw - 14, y, vx + vw, y + h, (a << 24) | 0x4A2EA0);
-        mc.font.drawShadow(ms, ">", vx + vw - 10, y + (h - 8) / 2, (a << 24) | 0xB090FF);
-
-        // Current value text centered
         int textX = vx + vw / 2 - mc.font.width(curLabel) / 2;
-        mc.font.drawShadow(ms, curLabel, textX, y + (h - 8) / 2, (a << 24) | 0xE0D8FF);
+        mc.font.drawShadow(ms, curLabel, textX, ay + (h - 8) / 2, (a << 24) | 0xE0D8FF);
 
-        // Purple border
         int bc = 0x6A4CBF;
-        AbstractGui.fill(ms, vx, y, vx + vw, y + 1, (a << 24) | bc);
-        AbstractGui.fill(ms, vx, y + h - 1, vx + vw, y + h, (a << 24) | bc);
-        AbstractGui.fill(ms, vx, y, vx + 1, y + h, (a << 24) | bc);
-        AbstractGui.fill(ms, vx + vw - 1, y, vx + vw, y + h, (a << 24) | bc);
+        AbstractGui.fill(ms, vx, ay, vx + vw, ay + 1, (a << 24) | bc);
+        AbstractGui.fill(ms, vx, ay + h - 1, vx + vw, ay + h, (a << 24) | bc);
+        AbstractGui.fill(ms, vx, ay, vx + 1, ay + h, (a << 24) | bc);
+        AbstractGui.fill(ms, vx + vw - 1, ay, vx + vw, ay + h, (a << 24) | bc);
 
-        // Label
-        mc.font.drawShadow(ms, label, x + 5, y + (h - 8) / 2, (a << 24) | 0xE0D8FF);
+        mc.font.drawShadow(ms, label, ax + 5, ay + (h - 8) / 2, (a << 24) | 0xE0D8FF);
     }
 
     private static int clamp(int v) { return Math.max(0, Math.min(255, v)); }

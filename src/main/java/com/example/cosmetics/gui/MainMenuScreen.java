@@ -49,6 +49,13 @@ public class MainMenuScreen extends Screen {
     private final List<CategoryTab> categoryTabs = new ArrayList<>();
     private GitHubButton githubButton;
 
+    // Tab scroll
+    private float tabScrollOffset = 0F;
+    private float tabScrollTarget = 0F;
+    private int   tabAreaH        = 0;
+    private int   tabContentH     = 0;
+    private static final int TAB_SCROLL_W = 4;
+
     // Panel origin
     private int px, py;
 
@@ -70,6 +77,11 @@ public class MainMenuScreen extends Screen {
             categoryTabs.add(new CategoryTab(px + 8, py + 44 + i * 24, TAB_W, 20, c));
             i++;
         }
+
+        // Tab scroll area: from header to hint bar
+        tabAreaH     = PANEL_H - 44 - 28;
+        tabContentH  = FeatureType.Category.values().length * 24 - 4;
+        tabScrollOffset = 0F; tabScrollTarget = 0F;
 
         // Card area: right of tabs, above hint bar, leave room for scrollbar
         cardX     = px + TAB_W + 16;
@@ -100,6 +112,7 @@ public class MainMenuScreen extends Screen {
     public void render(MatrixStack ms, int mouseX, int mouseY, float partialTicks) {
         // Smooth scroll interpolation (each render frame)
         scrollOffset += (scrollTarget - scrollOffset) * 0.2F;
+        tabScrollOffset += (tabScrollTarget - tabScrollOffset) * 0.2F;
 
         float anim = animProgress();
         fill(ms, 0, 0, this.width, this.height, (int)(anim * 155) << 24);
@@ -121,8 +134,12 @@ public class MainMenuScreen extends Screen {
         int glowC = (clamp((int)(anim * 200)) << 24) | 0x9B6DFF;
         fill(ms, px + PANEL_W / 2 - 55, py + 28, px + PANEL_W / 2 + 55, py + 30, glowC);
 
-        // Category tabs
-        for (CategoryTab c : categoryTabs) c.draw(ms, mouseX, mouseY, anim, current);
+        // Category tabs (with scroll)
+        int tabScroll = (int) tabScrollOffset;
+        for (CategoryTab c : categoryTabs) c.draw(ms, mouseX, mouseY, anim, current, tabScroll);
+
+        // Tab scrollbar
+        drawTabScrollbar(ms, anim);
 
         // ---- Scissored card area ------------------------------------------------
         // Draw cards with clipping
@@ -192,6 +209,26 @@ public class MainMenuScreen extends Screen {
         fill(ms, knobX, pY + 1, knobX + pillH - 2, pY + pillH - 1, withAlpha(0xFFFFFFFF, alpha));
     }
 
+    private void drawTabScrollbar(MatrixStack ms, float anim) {
+        float maxTabScroll = Math.max(0F, tabContentH - tabAreaH);
+        if (maxTabScroll <= 0) return;
+
+        int sbX = px + 8 + TAB_W + 1;
+        int sbY = py + 44;
+        int sbH = tabAreaH;
+
+        fill(ms, sbX, sbY, sbX + TAB_SCROLL_W, sbY + sbH,
+                withAlpha(0xFF1A1730, anim));
+
+        float ratio  = (float) tabAreaH / tabContentH;
+        int thumbH   = Math.max(10, (int)(sbH * ratio));
+        float frac   = tabScrollOffset / maxTabScroll;
+        int thumbY   = sbY + (int)((sbH - thumbH) * frac);
+
+        fill(ms, sbX + 1, thumbY, sbX + TAB_SCROLL_W - 1, thumbY + thumbH,
+                withAlpha(0xFF7050B0, anim));
+    }
+
     private void drawScrollbar(MatrixStack ms, float anim) {
         if (maxScroll() <= 0) return;
 
@@ -223,8 +260,17 @@ public class MainMenuScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double delta) {
-        scrollTarget -= (float)(delta * (CARD_H + CARD_GAP));
-        scrollTarget  = Math.max(0, Math.min(maxScroll(), scrollTarget));
+        // Если мышь над зоной табов — скроллим табы
+        float maxTabScroll = Math.max(0F, tabContentH - tabAreaH);
+        boolean overTabs = mx >= px + 8 && mx <= px + 8 + TAB_W + TAB_SCROLL_W
+                        && my >= py + 44 && my <= py + 44 + tabAreaH;
+        if (overTabs && maxTabScroll > 0) {
+            tabScrollTarget -= (float)(delta * 24);
+            tabScrollTarget  = Math.max(0, Math.min(maxTabScroll, tabScrollTarget));
+        } else {
+            scrollTarget -= (float)(delta * (CARD_H + CARD_GAP));
+            scrollTarget  = Math.max(0, Math.min(maxScroll(), scrollTarget));
+        }
         return true;
     }
 
@@ -243,7 +289,8 @@ public class MainMenuScreen extends Screen {
         if (githubButton != null && githubButton.contains(mx, my)) { openRepo(); return true; }
 
         for (CategoryTab c : categoryTabs) {
-            if (c.contains(mx, my)) {
+            if (c.containsScrolled(mx, my, (int) tabScrollOffset,
+                                   py + 44, py + 44 + tabAreaH)) {
                 current = c.category;
                 rebuildFeatures();
                 return true;
@@ -330,19 +377,45 @@ public class MainMenuScreen extends Screen {
         CategoryTab(int x, int y, int w, int h, FeatureType.Category c) {
             this.x=x; this.y=y; this.w=w; this.h=h; this.category=c;
         }
+        // Проверка клика с учётом скролла и видимой зоны
+        boolean containsScrolled(double mx, double my, int scroll, int clipTop, int clipBot) {
+            int ry = y - scroll;
+            if (ry + h < clipTop || ry > clipBot) return false;
+            return mx >= x && mx <= x + w && my >= ry && my <= ry + h;
+        }
         boolean contains(double mx, double my) { return mx>=x&&mx<=x+w&&my>=y&&my<=y+h; }
-        void draw(MatrixStack ms, int mx, int my, float alpha, FeatureType.Category sel) {
-            boolean hover = contains(mx,my), selected = sel==category;
-            float hov = hover?1F:0F;
-            fill(ms,x,y,x+w,y+h, withAlpha(blendColor(0xFF1A1730,0xFF2B2550,selected?1F:hov),alpha));
+
+        void draw(MatrixStack ms, int mx, int my, float alpha,
+                  FeatureType.Category sel, int scroll) {
+            int ry = y - scroll;
+            // Не рисуем если полностью за пределами зоны табов
+            int clipTop = py + 44, clipBot = py + 44 + tabAreaH;
+            if (ry + h < clipTop || ry > clipBot) return;
+
+            // Fade у границ (верх и низ)
+            float fadeRange = 8F;
+            float topFade = ry < clipTop + fadeRange
+                    ? Math.max(0F, (ry - clipTop) / fadeRange) : 1F;
+            float botFade = (ry + h) > clipBot - fadeRange
+                    ? Math.max(0F, (clipBot - (ry + h)) / fadeRange) : 1F;
+            float fade = Math.min(topFade, botFade);
+
+            boolean hover = mx >= x && mx <= x + w && my >= ry && my <= ry + h;
+            boolean selected = sel == category;
+            float hov = hover ? 1F : 0F;
+
+            fill(ms, x, ry, x+w, ry+h,
+                    withAlpha(blendColor(0xFF1A1730, 0xFF2B2550, selected?1F:hov), alpha*fade));
             if (selected) {
-                fill(ms,x,y,x+3,y+h, withAlpha(0xFF9B6DFF,alpha));
-                fill(ms,x+3,y,x+4,y+h, withAlpha(0x409B6DFF,alpha));
-            } else if (hov>0) {
-                fill(ms,x,y,x+2,y+h, withAlpha(0xFF604090,alpha*hov));
+                fill(ms, x, ry, x+3, ry+h, withAlpha(0xFF9B6DFF, alpha*fade));
+                fill(ms, x+3, ry, x+4, ry+h, withAlpha(0x409B6DFF, alpha*fade));
+            } else if (hov > 0) {
+                fill(ms, x, ry, x+2, ry+h, withAlpha(0xFF604090, alpha*hov*fade));
             }
-            String label = category.name().charAt(0)+category.name().substring(1).toLowerCase();
-            drawString(ms,font,label,x+10,y+(h-8)/2, withAlpha(selected?0xFFE8D8FF:0xFFCCCCCC,alpha));
+            String label = category.name().charAt(0)
+                    + category.name().substring(1).toLowerCase();
+            drawString(ms, font, label, x+10, ry+(h-8)/2,
+                    withAlpha(selected ? 0xFFE8D8FF : 0xFFCCCCCC, alpha*fade));
         }
     }
 

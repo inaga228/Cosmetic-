@@ -37,17 +37,14 @@ public final class CombatHandler {
     private static final Random RNG = new Random();
 
     // ---- Kill Aura state ----------------------------------------------------
-    // Собственный таймер атак — не зависит от клиентского getAttackStrengthScale
-    private int  auraAttackCooldown = 0; // тики до следующей атаки
-    private boolean critJumpPending = false; // прыжок для крита выполнен, ждём удара
+    private int  auraAttackCooldown = 0;
+    private boolean critJumpPending = false;
     private int  critJumpTick       = -999;
+    private long auraNextAttackMs   = 0; // для ms-точной задержки
 
     // ---- Auto Clicker -------------------------------------------------------
     private int clickerTick     = 0;
     private int clickerInterval = 4;
-
-    // ---- Strafe -------------------------------------------------------------
-    private double strafeAngle = 0;
 
     // ---- Auto Pot / Auto Gap ------------------------------------------------
     private int potCooldown = 0;
@@ -98,33 +95,56 @@ public final class CombatHandler {
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
             auraAttackCooldown = 0;
             critJumpPending    = false;
+            auraNextAttackMs   = 0;
             return;
         }
 
         FeatureSettings fs = CosmeticsState.get().settings(FeatureType.KILL_AURA);
-        float range = Math.max(0.5F, Math.min(10F, fs.size));
+        float range    = Math.max(0.5F, Math.min(10F, fs.size));
+        float minRange = Math.max(0F, Math.min(range - 0.1F, fs.killAuraMinRange));
+        float fov      = Math.max(10F, Math.min(360F, fs.killAuraFov));
 
-        // Тик нашего таймера
-        if (auraAttackCooldown > 0) {
-            auraAttackCooldown--;
-            return;
-        }
+        if (auraAttackCooldown > 0) { auraAttackCooldown--; return; }
 
         // ---- Поиск цели -------------------------------------------------------
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(range),
-                e -> isValidKillAuraTarget(e, player, fs));
+                e -> {
+                    if (!isValidKillAuraTarget(e, player, fs)) return false;
+                    double dist = e.distanceTo(player);
+                    if (dist < minRange) return false;
+                    // FOV фильтр
+                    if (fov < 360F) {
+                        double dx = e.getX() - player.getX();
+                        double dz = e.getZ() - player.getZ();
+                        float needYaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+                        if (Math.abs(wrapDeg(needYaw - player.yRot)) > fov / 2F) return false;
+                    }
+                    // Raytrace — только при прямой видимости
+                    if (fs.killAuraRaytrace) {
+                        net.minecraft.util.math.vector.Vector3d eyePos =
+                                player.getEyePosition(1F);
+                        net.minecraft.util.math.vector.Vector3d entPos =
+                                e.position().add(0, e.getBbHeight() * 0.5, 0);
+                        net.minecraft.util.math.BlockRayTraceResult brt =
+                                mc.level.clip(new net.minecraft.util.math.RayTraceContext(
+                                        eyePos, entPos,
+                                        net.minecraft.util.math.RayTraceContext.BlockMode.COLLIDER,
+                                        net.minecraft.util.math.RayTraceContext.FluidMode.NONE,
+                                        player));
+                        if (brt.getType() == net.minecraft.util.math.RayTraceResult.Type.BLOCK)
+                            return false;
+                    }
+                    return true;
+                });
 
-        if (candidates.isEmpty()) {
-            critJumpPending = false;
-            return;
-        }
+        if (candidates.isEmpty()) { critJumpPending = false; return; }
 
         LivingEntity target = pickTarget(candidates, player, fs.killAuraSortMode);
         if (target == null) return;
 
-        // ---- Мгновенное наведение -------------------------------------------
+        // ---- Наведение -------------------------------------------------------
         double dx   = target.getX() - player.getX();
         double dy   = (target.getY() + target.getBbHeight() * 0.5)
                     - (player.getY() + player.getEyeHeight());
@@ -146,17 +166,24 @@ public final class CombatHandler {
                 player.yBodyRot = wantYaw;
                 player.yHeadRot = wantYaw;
                 break;
-            // case 2: SILENT — ничего не трогаем
+            // case 2: SILENT — ничего
         }
 
-        // ---- Ждём полного заряда оружия -------------------------------------
-        // getAttackStrengthScale(0F) = 1.0 когда оружие полностью заряжено
+        // ---- Ждём полного заряда --------------------------------------------
         float charge = player.getAttackStrengthScale(0F);
         if (charge < 1.0F) return;
 
+        // ---- Кастомная задержка атаки ----------------------------------------
+        if (fs.killAuraAttackDelay > 0 || fs.killAuraAttackDelayRand > 0) {
+            long now = System.currentTimeMillis();
+            if (now < auraNextAttackMs) return;
+            long delay = fs.killAuraAttackDelay
+                    + (long)(STRAFE_RNG.nextFloat() * fs.killAuraAttackDelayRand);
+            auraNextAttackMs = now + delay;
+        }
+
         // ---- Auto Crit -------------------------------------------------------
         if (fs.killAuraAutoCrit) {
-            // Фаза 1: делаем прыжок
             if (!critJumpPending) {
                 boolean canCrit = player.isOnGround()
                         && !player.isCrouching()
@@ -166,33 +193,25 @@ public final class CombatHandler {
                 if (canCrit) {
                     int tick = (int)(mc.level.getGameTime() & 0x7FFFFFFF);
                     if (tick != critJumpTick) {
-                        // Микро-прыжок
                         player.setDeltaMovement(
-                                player.getDeltaMovement().x,
-                                0.11,
+                                player.getDeltaMovement().x, 0.11,
                                 player.getDeltaMovement().z);
                         critJumpTick    = tick;
                         critJumpPending = true;
-                        // Ждём 1 тик чтобы встать в воздух, потом ударим
                         auraAttackCooldown = 1;
                         return;
                     }
                 }
             }
-            // Фаза 2: мы уже прыгнули — бьём
             critJumpPending = false;
         }
 
         // ---- Атака -----------------------------------------------------------
         mc.gameMode.attack(player, target);
-        player.swing(Hand.MAIN_HAND);
+        if (fs.killAuraSwing) player.swing(Hand.MAIN_HAND);
 
-        // Рассчитываем тики cooldown оружия
-        // attackSpeed атрибут: меч = 1.6, топор = 0.9, кулак = 4.0
-        // Тиков до полного заряда = 20 / attackSpeed
         double atkSpeed = player.getAttributeValue(
                 net.minecraft.entity.ai.attributes.Attributes.ATTACK_SPEED);
-        // Минимум 1 тик, добавляем 1 тик запаса чтобы не бить раньше времени
         int cooldownTicks = Math.max(1, (int) Math.ceil(20.0 / atkSpeed));
         auraAttackCooldown = cooldownTicks;
     }
@@ -311,7 +330,16 @@ public final class CombatHandler {
 
     // =========================================================================
     // STRAFE
+    // Режимы:
+    //   0 = Circle  — плавное вращение вокруг цели
+    //   1 = Side    — шаг в сторону на каждый тик
+    //   2 = Zigzag  — чередует стороны, сложнее предсказать
     // =========================================================================
+    private double strafeAngle    = 0;
+    private int    strafeZigzagDir = 1;
+    private int    strafeZigzagTimer = 0;
+    private static final Random STRAFE_RNG = new Random();
+
     private void tickStrafe(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.STRAFE)) return;
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) return;
@@ -319,29 +347,109 @@ public final class CombatHandler {
 
         FeatureSettings fs   = CosmeticsState.get().settings(FeatureType.STRAFE);
         FeatureSettings kaFs = CosmeticsState.get().settings(FeatureType.KILL_AURA);
-        float speed = Math.max(0.5F, Math.min(5F, fs.speed));
-        float range = Math.max(0.5F, Math.min(10F, kaFs.size));
+        float speed  = Math.max(0.5F, Math.min(5F, fs.speed));
+        float range  = Math.max(0.5F, Math.min(10F, kaFs.size));
 
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
-                player.getBoundingBox().inflate(range),
+                player.getBoundingBox().inflate(range + 2.0),
                 e -> isValidKillAuraTarget(e, player, kaFs));
-        if (candidates.isEmpty()) return;
+        if (candidates.isEmpty()) { strafeAngle = 0; return; }
 
         LivingEntity target = candidates.stream()
                 .min(Comparator.comparingDouble(e -> e.distanceToSqr(player)))
                 .orElse(null);
         if (target == null) return;
 
-        strafeAngle += speed * 0.05;
-        double radius = Math.max(2.0, range * 0.6);
-        double tx = target.getX() + Math.cos(strafeAngle) * radius;
-        double tz = target.getZ() + Math.sin(strafeAngle) * radius;
-        double mx = tx - player.getX(), mz = tz - player.getZ();
-        double len = Math.sqrt(mx * mx + mz * mz);
-        if (len > 0.01) {
-            player.setDeltaMovement(mx / len * 0.28, player.getDeltaMovement().y, mz / len * 0.28);
+        // Если нужно только в бою (есть цель в зоне атаки)
+        if (fs.strafeOnlyInCombat && target.distanceTo(player) > range) return;
+
+        int mode = Math.floorMod(fs.strafeMode, 3);
+        int dir  = Math.floorMod(fs.strafeDirection, 3);
+        // dir: 0=Left(-1) 1=Right(+1) 2=Random
+        double dirSign;
+        if (dir == 2) {
+            // Рандом при смене цели — один раз выбираем
+            dirSign = (STRAFE_RNG.nextBoolean() ? 1 : -1);
+        } else {
+            dirSign = (dir == 1) ? 1.0 : -1.0;
         }
+
+        switch (mode) {
+            case 0: { // ---- CIRCLE — плавно вращаемся вокруг цели
+                // Скорость: добавляем небольшой рандом ±5% чтобы не выглядеть ботом
+                double noise  = 1.0 + (STRAFE_RNG.nextDouble() - 0.5) * 0.10;
+                strafeAngle  += dirSign * speed * 0.045 * noise;
+                double radius = Math.max(1.8, Math.min(5.0, fs.strafeRadius));
+                double tx = target.getX() + Math.cos(strafeAngle) * radius;
+                double tz = target.getZ() + Math.sin(strafeAngle) * radius;
+                double dx = tx - player.getX();
+                double dz = tz - player.getZ();
+                double len = Math.sqrt(dx * dx + dz * dz);
+                if (len > 0.05) {
+                    double baseSpd = 0.26 + (speed - 1) * 0.02;
+                    double spdNoise = 1.0 + (STRAFE_RNG.nextDouble() - 0.5) * 0.08;
+                    double mv = Math.min(len, baseSpd * spdNoise);
+                    player.setDeltaMovement(
+                            (dx / len) * mv,
+                            player.getDeltaMovement().y,
+                            (dz / len) * mv);
+                }
+                // Плавный поворот к цели при CIRCLE
+                double ddx = target.getX() - player.getX();
+                double ddz = target.getZ() - player.getZ();
+                float wantYaw = (float)(Math.toDegrees(Math.atan2(ddz, ddx)) - 90.0);
+                player.yRot = lerpAngle(player.yRot, wantYaw, 0.15F);
+                break;
+            }
+            case 1: { // ---- SIDE — шаг строго в сторону от направления к цели
+                double ddx = target.getX() - player.getX();
+                double ddz = target.getZ() - player.getZ();
+                double len  = Math.sqrt(ddx * ddx + ddz * ddz);
+                if (len < 0.01) break;
+                // Перпендикуляр
+                double sideX =  dirSign * ddz / len;
+                double sideZ = -dirSign * ddx / len;
+                double baseSpd = 0.25 + (speed - 1) * 0.02;
+                double spdNoise = 1.0 + (STRAFE_RNG.nextDouble() - 0.5) * 0.06;
+                // Jitter — небольшое смещение вперёд/назад против предиктора
+                double jitterFwd = 0;
+                if (fs.strafeJitter) jitterFwd = (STRAFE_RNG.nextDouble() - 0.5) * 0.07;
+                double mvX = sideX * baseSpd * spdNoise + (ddx / len) * jitterFwd;
+                double mvZ = sideZ * baseSpd * spdNoise + (ddz / len) * jitterFwd;
+                player.setDeltaMovement(mvX, player.getDeltaMovement().y, mvZ);
+                float wantYaw = (float)(Math.toDegrees(Math.atan2(ddz, ddx)) - 90.0);
+                player.yRot = lerpAngle(player.yRot, wantYaw, 0.2F);
+                break;
+            }
+            case 2: { // ---- ZIGZAG — чередует Left/Right каждые N тиков
+                strafeZigzagTimer--;
+                if (strafeZigzagTimer <= 0) {
+                    strafeZigzagDir = -strafeZigzagDir;
+                    // Случайный интервал 6-14 тиков — сложнее предсказать
+                    strafeZigzagTimer = 6 + STRAFE_RNG.nextInt(9);
+                }
+                double ddx = target.getX() - player.getX();
+                double ddz = target.getZ() - player.getZ();
+                double len  = Math.sqrt(ddx * ddx + ddz * ddz);
+                if (len < 0.01) break;
+                double sideX =  strafeZigzagDir * ddz / len;
+                double sideZ = -strafeZigzagDir * ddx / len;
+                double baseSpd = 0.24 + (speed - 1) * 0.02;
+                double spdNoise = 1.0 + (STRAFE_RNG.nextDouble() - 0.5) * 0.08;
+                double jitterFwd = 0;
+                if (fs.strafeJitter) jitterFwd = (STRAFE_RNG.nextDouble() - 0.5) * 0.08;
+                player.setDeltaMovement(
+                        sideX * baseSpd * spdNoise + (ddx / len) * jitterFwd,
+                        player.getDeltaMovement().y,
+                        sideZ * baseSpd * spdNoise + (ddz / len) * jitterFwd);
+                float wantYaw = (float)(Math.toDegrees(Math.atan2(ddz, ddx)) - 90.0);
+                player.yRot = lerpAngle(player.yRot, wantYaw, 0.2F);
+                break;
+            }
+        }
+        // Sprint toggle
+        if (fs.strafeSprint && !player.isSprinting()) player.setSprinting(true);
     }
 
     // =========================================================================

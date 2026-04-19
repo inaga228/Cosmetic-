@@ -30,17 +30,30 @@ public class Slider {
 
     public boolean mousePressed(double mx, double my, int button) {
         if (button == 0 && contains(mx, my)) {
-            dragging = true; updateFromMouse(mx); return true;
+            dragging = true; updateFromMouse(mx, x); return true;
+        }
+        return false;
+    }
+
+    /** Версия с offset для скролла: ox/oy — смещение начала координат виджетов */
+    public boolean mousePressedAt(double mx, double my, int button, int ox, int oy) {
+        int ax = ox + x, ay = oy + y;
+        if (button == 0 && mx >= ax && mx <= ax + w && my >= ay && my <= ay + h) {
+            dragging = true; updateFromMouse(mx, ax); return true;
         }
         return false;
     }
 
     public void mouseReleased() { dragging = false; }
 
-    public void mouseDragged(double mx) { if (dragging) updateFromMouse(mx); }
+    public void mouseDragged(double mx) { if (dragging) updateFromMouse(mx, x); }
 
-    private void updateFromMouse(double mx) {
-        double t = Math.max(0, Math.min(1, (mx - x) / (double) w));
+    public void mouseDraggedAt(double mx, int ox, int oy) {
+        if (dragging) updateFromMouse(mx, ox + x);
+    }
+
+    private void updateFromMouse(double mx, int startX) {
+        double t = Math.max(0, Math.min(1, (mx - startX) / (double) w));
         setter.accept((float)(min + t * (max - min)));
     }
 
@@ -54,31 +67,32 @@ public class Slider {
     }
 
     public void draw(MatrixStack ms, float alpha) {
+        drawAt(ms, alpha, 0, 0);
+    }
+
+    /** Рисует виджет со смещением ox/oy (для скролла). */
+    public void drawAt(MatrixStack ms, float alpha, int ox, int oy) {
         Minecraft mc = Minecraft.getInstance();
+        int ax = ox + x, ay = oy + y;
         int a = clamp((int)(alpha * 255));
 
-        // Background track
-        AbstractGui.fill(ms, x, y, x + w, y + h, (a << 24) | 0x16132A);
+        AbstractGui.fill(ms, ax, ay, ax + w, ay + h, (a << 24) | 0x16132A);
 
-        // Filled portion
         float t = (float)((getter.getAsDouble() - min) / (max - min));
         t = Math.max(0, Math.min(1, t));
         int fillW = (int)(w * t);
 
-        // Gradient fill: darker purple -> bright purple
         if (fillW > 0) {
-            AbstractGui.fill(ms, x, y, x + fillW, y + h, (a << 24) | 0x5A3AB0);
-            AbstractGui.fill(ms, x, y, x + Math.min(fillW, 3), y + h, (a << 24) | 0x9B6DFF);
+            AbstractGui.fill(ms, ax, ay, ax + fillW, ay + h, (a << 24) | 0x5A3AB0);
+            AbstractGui.fill(ms, ax, ay, ax + Math.min(fillW, 3), ay + h, (a << 24) | 0x9B6DFF);
         }
 
-        // Knob
-        int knobX = x + fillW - 2;
-        AbstractGui.fill(ms, knobX, y - 1, knobX + 5, y + h + 1, (a << 24) | 0xFFFFFF);
-        AbstractGui.fill(ms, knobX + 1, y, knobX + 4, y + h, (a << 24) | 0xDDCCFF);
+        int knobX = ax + fillW - 2;
+        AbstractGui.fill(ms, knobX, ay - 1, knobX + 5, ay + h + 1, (a << 24) | 0xFFFFFF);
+        AbstractGui.fill(ms, knobX + 1, ay, knobX + 4, ay + h, (a << 24) | 0xDDCCFF);
 
-        // Label + value
         String text = label + ": " + formatValue();
-        mc.font.drawShadow(ms, text, x + 5, y + (h - 8) / 2, (a << 24) | 0xE0D8FF);
+        mc.font.drawShadow(ms, text, ax + 5, ay + (h - 8) / 2, (a << 24) | 0xE0D8FF);
     }
 
     private static int clamp(int v) { return Math.max(0, Math.min(255, v)); }

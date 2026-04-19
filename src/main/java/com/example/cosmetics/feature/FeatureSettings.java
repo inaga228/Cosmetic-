@@ -47,7 +47,22 @@ public final class FeatureSettings {
     public boolean clickerOnlyInRange       = false;
 
     // ---- Strafe -------------------------------------------------------------
-    public int     strafeDirection          = 0; // 0=Left 1=Right 2=Random
+    public int     strafeDirection          = 2; // 0=Left 1=Right 2=Random
+    public int     strafeMode               = 0; // 0=Circle 1=Side 2=Zigzag
+    public float   strafeRadius             = 2.5F;
+    public boolean strafeOnlyInCombat       = true;
+    public boolean strafeSprint             = true;
+    public boolean strafeJitter             = false; // мелкое смещение против предсказания
+
+    // ---- Kill Aura extended -------------------------------------------------
+    public float   killAuraMinRange         = 0.5F;
+    public boolean killAuraIgnoreWalls      = false;
+    public boolean killAuraSwing            = true;
+    public boolean killAuraRaytrace         = false; // только при прямой видимости
+    public int     killAuraAttackDelay      = 0;   // доп. задержка мс (0 = выкл)
+    public float   killAuraAttackDelayRand  = 0F;  // рандом ±мс сверху задержки
+    public boolean killAuraSilentRotation   = false;
+    public float   killAuraFov              = 180F; // угол обзора для поиска цели (180=любое направление)
 
     // ---- HUD ----------------------------------------------------------------
     public boolean hudOnlyWhenActive        = false;
