@@ -77,7 +77,7 @@ public class SettingsScreen extends Screen {
                     () -> fs.speed, v -> fs.speed = v));
         }
         if (feature.has(FeatureType.Caps.COUNT)) {
-            if (feature == FeatureType.FAST_PLACE) {
+            if (feature == FeatureType.CUSTOM_PLACE) {
                 sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Speed", 1F, 10F,
                         () -> (float) fs.count, v -> fs.count = Math.round(v)) {
                     @Override
