@@ -4,13 +4,17 @@ import com.example.cosmetics.client.CosmeticsState;
 import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
+import net.minecraft.client.multiplayer.PlayerController;
 import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.network.play.client.CPlayerDiggingPacket;
+import net.minecraft.network.play.client.CHeldItemChangePacket;
 import net.minecraft.potion.Effects;
 import net.minecraft.util.Hand;
 import net.minecraft.util.NonNullList;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 
 import java.lang.reflect.Field;
@@ -32,14 +36,15 @@ public final class UtilityHandler {
     // Fast Place
     private int placeTimer = 0;
 
+    // Auto Jump: track ground state to fire only once per landing
+    private boolean wasOnGround = true;
+
+    // Auto Totem: track which slot we last swapped to avoid redundant swaps
+    private int lastTotemSourceSlot = -1;
+
     /**
      * Reflected reference to Minecraft.rightClickDelay.
-     * In 1.16.5 official Mojang mappings this field is private, so we access
-     * it via reflection once and cache the Field object for performance.
-     *
-     * Possible field names depending on mapping layer:
-     *   official / Mojang : "rightClickDelay"
-     *   srg / MCP         : "field_71467_aa" (srg name as fallback)
+     * In 1.16.5 official Mojang mappings this field is private.
      */
     private static final Field RIGHT_CLICK_DELAY_FIELD;
     static {
@@ -51,10 +56,9 @@ public final class UtilityHandler {
                 break;
             } catch (NoSuchFieldException ignored) {}
         }
-        RIGHT_CLICK_DELAY_FIELD = f; // null if neither name matched (shouldn't happen)
+        RIGHT_CLICK_DELAY_FIELD = f;
     }
 
-    /** Sets Minecraft.rightClickDelay to 0 via reflection. */
     private static void resetRightClickDelay(Minecraft mc) {
         if (RIGHT_CLICK_DELAY_FIELD == null) return;
         try {
@@ -62,7 +66,7 @@ public final class UtilityHandler {
         } catch (IllegalAccessException ignored) {}
     }
 
-    // Fullbright: remember original gamma so we can restore it on disable.
+    // Fullbright
     private float originalGamma = -1F;
     private boolean fullbrightActive = false;
 
@@ -78,7 +82,7 @@ public final class UtilityHandler {
         tickAutoJump(player, state);
         tickAutoSneak(player, state);
         tickFullbright(mc, state);
-        tickAutoTotem(player, state);
+        tickAutoTotem(mc, player, state);
         tickFastPlace(mc, player, state);
     }
 
@@ -99,21 +103,34 @@ public final class UtilityHandler {
 
     // -------------------------------------------------------------------------
     // Auto Jump
+    //
+    // Fires jumpFromGround() exactly ONCE per ground contact — on the rising
+    // edge when the player lands after being airborne. This matches what a human
+    // does when spam-pressing space and won't trigger antiCheat jump-frequency
+    // checks (no more 20 jumps/sec).
     // -------------------------------------------------------------------------
     private void tickAutoJump(ClientPlayerEntity player, CosmeticsState state) {
-        if (!state.isOn(FeatureType.AUTO_JUMP)) return;
-        if (!player.isOnGround()) return;
-        if (player.isCrouching()) return;
+        boolean onGround = player.isOnGround();
 
-        Minecraft mc = Minecraft.getInstance();
-        boolean moving = mc.options.keyUp.isDown()
-                || mc.options.keyDown.isDown()
-                || mc.options.keyLeft.isDown()
-                || mc.options.keyRight.isDown();
-
-        if (moving) {
-            player.jumpFromGround();
+        if (!state.isOn(FeatureType.AUTO_JUMP)) {
+            wasOnGround = onGround;
+            return;
         }
+
+        if (!player.isCrouching()) {
+            Minecraft mc = Minecraft.getInstance();
+            boolean moving = mc.options.keyUp.isDown()
+                    || mc.options.keyDown.isDown()
+                    || mc.options.keyLeft.isDown()
+                    || mc.options.keyRight.isDown();
+
+            // Rising edge: just landed (airborne → on ground). Jump once.
+            if (moving && onGround && !wasOnGround) {
+                player.jumpFromGround();
+            }
+        }
+
+        wasOnGround = onGround;
     }
 
     // -------------------------------------------------------------------------
@@ -152,18 +169,35 @@ public final class UtilityHandler {
 
     // -------------------------------------------------------------------------
     // Auto Totem
+    //
+    // The old approach only swapped items locally on the client — the server
+    // never knew about it, so the totem didn't fire on death.
+    //
+    // Fix: we move the totem into hotbar slot 0, switch the held item to slot 0
+    // via CHeldItemChangePacket (so the server registers it in the main hand),
+    // then send F-key swap (CPlayerDiggingPacket SWAP_ITEM_WITH_OFFHAND) to
+    // move it to offhand — all server-side acknowledged.
+    //
+    // We only do this once per "need" (lastTotemSourceSlot tracks it) to avoid
+    // spamming packets every tick.
     // -------------------------------------------------------------------------
-    private void tickAutoTotem(ClientPlayerEntity player, CosmeticsState state) {
+    private void tickAutoTotem(Minecraft mc, ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.AUTO_TOTEM)) return;
+
+        // If offhand already has a totem, nothing to do.
+        if (player.getItemInHand(Hand.OFF_HAND).getItem() == Items.TOTEM_OF_UNDYING) {
+            lastTotemSourceSlot = -1;
+            return;
+        }
 
         int thresholdHearts = state.settings(FeatureType.AUTO_TOTEM).count;
         float thresholdHp = thresholdHearts * 2.0F;
-        float currentHp = player.getHealth();
+        if (player.getHealth() > thresholdHp) {
+            lastTotemSourceSlot = -1;
+            return;
+        }
 
-        ItemStack offhand = player.getItemInHand(Hand.OFF_HAND);
-        if (offhand.getItem() == Items.TOTEM_OF_UNDYING) return;
-        if (currentHp > thresholdHp) return;
-
+        // Find totem in main inventory (slots 0-35).
         NonNullList<ItemStack> inv = player.inventory.items;
         int totemSlot = -1;
         for (int i = 0; i < inv.size(); i++) {
@@ -174,18 +208,47 @@ public final class UtilityHandler {
         }
         if (totemSlot == -1) return;
 
-        ItemStack totem = inv.get(totemSlot);
-        ItemStack currentOffhand = player.getItemInHand(Hand.OFF_HAND).copy();
+        // Already handled this slot this cycle.
+        if (totemSlot == lastTotemSourceSlot) return;
+        lastTotemSourceSlot = totemSlot;
 
-        player.inventory.offhand.set(0, totem.copy());
-        inv.set(totemSlot, currentOffhand.isEmpty() ? ItemStack.EMPTY : currentOffhand);
+        PlayerController pc = mc.gameMode;
+        if (pc == null) return;
+
+        if (totemSlot < 9) {
+            // Totem is already in hotbar — just switch to that slot and swap to offhand.
+            int previousSlot = player.inventory.selected;
+            player.inventory.selected = totemSlot;
+            mc.getConnection().send(new CHeldItemChangePacket(totemSlot));
+            mc.getConnection().send(new CPlayerDiggingPacket(
+                    CPlayerDiggingPacket.Action.SWAP_ITEM_WITH_OFFHAND,
+                    BlockPos.ZERO,
+                    net.minecraft.util.Direction.DOWN));
+            // Restore previous hotbar selection.
+            player.inventory.selected = previousSlot;
+            mc.getConnection().send(new CHeldItemChangePacket(previousSlot));
+        } else {
+            // Totem is in main inventory (slot 9-35). Use pick-block mechanic:
+            // swap it into hotbar slot 0 locally, then proceed as above.
+            int hotbarTarget = 0;
+            ItemStack hotbarItem = inv.get(hotbarTarget).copy();
+            inv.set(hotbarTarget, inv.get(totemSlot).copy());
+            inv.set(totemSlot, hotbarItem.isEmpty() ? ItemStack.EMPTY : hotbarItem);
+
+            int previousSlot = player.inventory.selected;
+            player.inventory.selected = hotbarTarget;
+            mc.getConnection().send(new CHeldItemChangePacket(hotbarTarget));
+            mc.getConnection().send(new CPlayerDiggingPacket(
+                    CPlayerDiggingPacket.Action.SWAP_ITEM_WITH_OFFHAND,
+                    BlockPos.ZERO,
+                    net.minecraft.util.Direction.DOWN));
+            player.inventory.selected = previousSlot;
+            mc.getConnection().send(new CHeldItemChangePacket(previousSlot));
+        }
     }
 
     // -------------------------------------------------------------------------
     // Fast Place
-    //
-    // Zeroes rightClickDelay every tick while RMB is held + block item in hand.
-    // Vanilla placement fires immediately each frame without the 4-tick delay.
     // -------------------------------------------------------------------------
     private void tickFastPlace(Minecraft mc, ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.FAST_PLACE)) return;
@@ -195,7 +258,6 @@ public final class UtilityHandler {
             return;
         }
 
-        // Must be looking at a block.
         if (mc.hitResult == null || mc.hitResult.getType() != RayTraceResult.Type.BLOCK) {
             placeTimer = 0;
             return;
@@ -210,8 +272,6 @@ public final class UtilityHandler {
             return;
         }
 
-        // Zero the placement cooldown — vanilla handles the actual placement.
-        // rightClickDelay is private in 1.16.5 official mappings, so we use reflection.
         resetRightClickDelay(mc);
     }
 }
