@@ -51,6 +51,9 @@ public final class CosmeticsState {
             case DRAGON_WINGS:  s.colorR = 0.60F; s.colorG = 0.30F; s.colorB = 1.00F;
                                 s.size = 0.75F; s.speed = 1.0F; s.style = 0; break;
 
+            case CAPE:          s.colorR = 0.80F; s.colorG = 0.20F; s.colorB = 0.20F;
+                                s.size = 1.0F; s.speed = 1.0F; s.style = 0; break;
+
             // Jump rings — bright cyan, moderate size, DOUBLE style by default
             case JUMP_CIRCLES:  s.colorR = 0.30F; s.colorG = 0.85F; s.colorB = 1.00F;
                                 s.size = 1.0F; s.speed = 1.0F; s.style = 2; break;

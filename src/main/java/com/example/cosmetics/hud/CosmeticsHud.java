@@ -1,6 +1,7 @@
 package com.example.cosmetics.hud;
 
 import com.example.cosmetics.client.CosmeticsState;
+import com.example.cosmetics.config.HudPositionManager;
 import com.example.cosmetics.feature.FeatureSettings;
 import com.example.cosmetics.feature.FeatureType;
 import com.example.cosmetics.gui.GuiDraw;
@@ -13,16 +14,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Top-left HUD panel showing the active cosmetics.
- *
- * Styles (via Caps.STYLE):
- *   0 = NEON     — purple gradient (classic)
- *   1 = MINIMAL  — flat dark bar with a single accent
- *   2 = OCEAN    — cyan/blue glow theme
- *   3 = FIRE     — orange/red wave theme with moving underline
- *   4 = MINT     — green neon theme
- */
 public final class CosmeticsHud {
 
     public static final String[] STYLE_NAMES = { "Neon", "Minimal", "Ocean", "Fire", "Mint" };
@@ -58,7 +49,8 @@ public final class CosmeticsHud {
         for (String l : lines) w = Math.max(w, f.width("• " + l) + padding * 2 + 6);
         int h = padding + 12 + 5 + Math.max(1, lines.size()) * lineH + padding;
 
-        int x = 8, y = 8;
+        int x = HudPositionManager.get().getCosmeticsX();
+        int y = HudPositionManager.get().getCosmeticsY();
         int style = Math.floorMod(fs.style, STYLE_NAMES.length);
 
         // Palette per style

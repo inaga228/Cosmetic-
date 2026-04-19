@@ -1,6 +1,8 @@
 package com.example.cosmetics.gui;
 
 import com.example.cosmetics.client.CosmeticsState;
+import com.example.cosmetics.config.ConfigManager;
+import com.example.cosmetics.config.ThemeManager;
 import com.example.cosmetics.feature.FeatureType;
 import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.Minecraft;
@@ -48,6 +50,8 @@ public class MainMenuScreen extends Screen {
     // Tabs & github
     private final List<CategoryTab> categoryTabs = new ArrayList<>();
     private GitHubButton githubButton;
+    private ThemeButton themeButton;
+    private HudEditButton hudEditButton;
 
     // Tab scroll
     private float tabScrollOffset = 0F;
@@ -92,6 +96,8 @@ public class MainMenuScreen extends Screen {
         rebuildFeatures();
 
         githubButton = new GitHubButton(px + PANEL_W - 96, py + PANEL_H - 26, 88, 20);
+        themeButton  = new ThemeButton(px + 8, py + PANEL_H - 26, 60, 20);
+        hudEditButton = new HudEditButton(px + 72, py + PANEL_H - 26, 60, 20);
     }
 
     private void rebuildFeatures() {
@@ -123,15 +129,16 @@ public class MainMenuScreen extends Screen {
         ms.scale(scale, scale, 1.0F);
         ms.translate(-this.width / 2f, -this.height / 2f, 0);
 
-        GuiDraw.roundedPanel(ms, px, py, PANEL_W, PANEL_H, anim);
+        ThemeManager tm = ThemeManager.get();
+        GuiDraw.themedPanel(ms, px, py, PANEL_W, PANEL_H, anim, tm.panelTop(), tm.panelBot(), tm.accent());
 
         // Title bar
         int titleA = clamp((int)(anim * 255));
         fillGradient(ms, px + 2, py + 2, px + PANEL_W - 2, py + 36,
-                (titleA << 24) | 0x1A1430, (titleA << 24) | 0x120E22);
+                (titleA << 24) | tm.panelTop(), (titleA << 24) | tm.panelBot());
         drawCenteredString(ms, this.font, "\u2726 Cosmetics \u2726",
                 px + PANEL_W / 2, py + 13, (titleA << 24) | 0xFFFFFF);
-        int glowC = (clamp((int)(anim * 200)) << 24) | 0x9B6DFF;
+        int glowC = (clamp((int)(anim * 200)) << 24) | (tm.accent() & 0xFFFFFF);
         fill(ms, px + PANEL_W / 2 - 55, py + 28, px + PANEL_W / 2 + 55, py + 30, glowC);
 
         // Category tabs (with scroll)
@@ -148,7 +155,9 @@ public class MainMenuScreen extends Screen {
         // Scrollbar
         drawScrollbar(ms, anim);
 
-        if (githubButton != null) githubButton.draw(ms, mouseX, mouseY, anim);
+        if (githubButton  != null) githubButton.draw(ms, mouseX, mouseY, anim);
+        if (themeButton   != null) themeButton.draw(ms, mouseX, mouseY, anim);
+        if (hudEditButton != null) hudEditButton.draw(ms, mouseX, mouseY, anim);
 
         int hintA = clamp((int)(anim * 160));
         drawCenteredString(ms, this.font, "LMB toggle  |  RMB settings  |  Scroll = scroll",
@@ -185,26 +194,28 @@ public class MainMenuScreen extends Screen {
         if (alpha <= 0) return;
         boolean hover = mx >= x && mx <= x + w && my >= y && my <= y + h;
         boolean on    = CosmeticsState.get().isOn(feature);
-        float   hov   = hover ? 1F : 0F; // instant for simplicity inside scissor
+        float   hov   = hover ? 1F : 0F;
 
-        int base = blendColor(0xFF16132A, 0xFF201C38, hov);
+        ThemeManager tm = ThemeManager.get();
+        int base = blendColor(tm.cardHover(), tm.cardOn(), hov);
         fill(ms, x, y, x + w, y + h, withAlpha(base, alpha));
 
         if (on) {
-            fill(ms, x, y, x + 3, y + h, withAlpha(0xFF8A5CFF, alpha));
-            fill(ms, x + 3, y, x + 5, y + h, withAlpha(0x508A5CFF, alpha));
+            fill(ms, x, y, x + 3, y + h, withAlpha(0xFF000000 | (tm.accent() & 0xFFFFFF), alpha));
+            fill(ms, x + 3, y, x + 5, y + h, withAlpha(0x50000000 | (tm.accent() & 0xFFFFFF), alpha));
         }
-        if (hover) fill(ms, x, y, x + w, y + 1, withAlpha(0xFF8A5CFF, alpha * 0.5F));
+        if (hover) fill(ms, x, y, x + w, y + 1, withAlpha(0xFF000000 | (tm.accent() & 0xFFFFFF), alpha * 0.5F));
 
         drawString(ms, font, feature.displayName, x + 10, y + (h - 8) / 2,
-                withAlpha(on ? 0xFFE8D8FF : 0xFFCCCCCC, alpha));
+                withAlpha(on ? (0xFF000000 | (tm.activeText() & 0xFFFFFF)) : 0xFFCCCCCC, alpha));
 
         // Pill toggle
         int pillW = 28, pillH = 12;
         int pX = x + w - pillW - 8;
         int pY = y + (h - pillH) / 2;
         fill(ms, pX, pY, pX + pillW, pY + pillH,
-                on ? withAlpha(0xFF7A4CFF, alpha) : withAlpha(0xFF3A3650, alpha));
+                on ? withAlpha(0xFF000000 | (tm.accent() & 0xFFFFFF), alpha)
+                   : withAlpha(0xFF3A3650, alpha));
         int knobX = on ? pX + pillW - pillH + 1 : pX + 1;
         fill(ms, knobX, pY + 1, knobX + pillH - 2, pY + pillH - 1, withAlpha(0xFFFFFFFF, alpha));
     }
@@ -217,16 +228,17 @@ public class MainMenuScreen extends Screen {
         int sbY = py + 44;
         int sbH = tabAreaH;
 
-        fill(ms, sbX, sbY, sbX + TAB_SCROLL_W, sbY + sbH,
-                withAlpha(0xFF1A1730, anim));
+        int track = 0xFF000000 | (ThemeManager.get().panelBot() & 0xFFFFFF);
+        fill(ms, sbX, sbY, sbX + TAB_SCROLL_W, sbY + sbH, withAlpha(track, anim));
 
         float ratio  = (float) tabAreaH / tabContentH;
         int thumbH   = Math.max(10, (int)(sbH * ratio));
         float frac   = tabScrollOffset / maxTabScroll;
         int thumbY   = sbY + (int)((sbH - thumbH) * frac);
 
+        int thumb = 0xFF000000 | (ThemeManager.get().accent() & 0xFFFFFF);
         fill(ms, sbX + 1, thumbY, sbX + TAB_SCROLL_W - 1, thumbY + thumbH,
-                withAlpha(0xFF7050B0, anim));
+                withAlpha(thumb, anim * 0.7F));
     }
 
     private void drawScrollbar(MatrixStack ms, float anim) {
@@ -236,10 +248,10 @@ public class MainMenuScreen extends Screen {
         int sbY  = cardY;
         int sbH  = cardAreaH;
 
-        // Track
-        fill(ms, sbX, sbY, sbX + SCROLL_W, sbY + sbH, withAlpha(0xFF1A1730, anim));
+        ThemeManager tm = ThemeManager.get();
+        int track = 0xFF000000 | (tm.panelBot() & 0xFFFFFF);
+        fill(ms, sbX, sbY, sbX + SCROLL_W, sbY + sbH, withAlpha(track, anim));
 
-        // Thumb
         float ratio      = (float) cardAreaH / contentHeight;
         int   thumbH     = Math.max(16, (int)(sbH * ratio));
         float scrollFrac = scrollOffset / maxScroll();
@@ -249,11 +261,14 @@ public class MainMenuScreen extends Screen {
                 Minecraft.getInstance().mouseHandler.xpos(),
                 Minecraft.getInstance().mouseHandler.ypos());
 
-        int thumbCol = hoverSb || draggingScroll ? 0xFF9B6DFF : 0xFF604090;
+        int accent = 0xFF000000 | (tm.accent() & 0xFFFFFF);
+        int thumbCol = hoverSb || draggingScroll ? accent
+                : (0xFF000000 | (blendColor(tm.panelTop(), tm.accent(), 0.4F) & 0xFFFFFF));
         fill(ms, sbX + 1, thumbY, sbX + SCROLL_W - 1, thumbY + thumbH, withAlpha(thumbCol, anim));
 
-        // Thumb top accent
-        fill(ms, sbX + 1, thumbY, sbX + SCROLL_W - 1, thumbY + 2, withAlpha(0xFFB898FF, anim));
+        // Thumb top accent line
+        int accentLight = 0xFF000000 | (blendColor(tm.accent(), 0xFFFFFF, 0.3F) & 0xFFFFFF);
+        fill(ms, sbX + 1, thumbY, sbX + SCROLL_W - 1, thumbY + 2, withAlpha(accentLight, anim));
     }
 
     // ---- Input -----------------------------------------------------------------
@@ -286,7 +301,16 @@ public class MainMenuScreen extends Screen {
             return true;
         }
 
-        if (githubButton != null && githubButton.contains(mx, my)) { openRepo(); return true; }
+        if (githubButton  != null && githubButton.contains(mx, my))  { openRepo(); return true; }
+        if (themeButton   != null && themeButton.contains(mx, my))   {
+            ThemeManager.get().next();
+            ConfigManager.get().save();
+            return true;
+        }
+        if (hudEditButton != null && hudEditButton.contains(mx, my)) {
+            Minecraft.getInstance().setScreen(new HudEditScreen());
+            return true;
+        }
 
         for (CategoryTab c : categoryTabs) {
             if (c.containsScrolled(mx, my, (int) tabScrollOffset,
@@ -350,6 +374,7 @@ public class MainMenuScreen extends Screen {
     }
 
     @Override public void onClose() {
+        ConfigManager.get().save();
         if (!closing) { closing = true; closingAtMs = System.currentTimeMillis(); }
         else super.onClose();
     }
@@ -388,11 +413,9 @@ public class MainMenuScreen extends Screen {
         void draw(MatrixStack ms, int mx, int my, float alpha,
                   FeatureType.Category sel, int scroll) {
             int ry = y - scroll;
-            // Не рисуем если полностью за пределами зоны табов
             int clipTop = py + 44, clipBot = py + 44 + tabAreaH;
             if (ry + h < clipTop || ry > clipBot) return;
 
-            // Fade у границ (верх и низ)
             float fadeRange = 8F;
             float topFade = ry < clipTop + fadeRange
                     ? Math.max(0F, (ry - clipTop) / fadeRange) : 1F;
@@ -400,22 +423,27 @@ public class MainMenuScreen extends Screen {
                     ? Math.max(0F, (clipBot - (ry + h)) / fadeRange) : 1F;
             float fade = Math.min(topFade, botFade);
 
-            boolean hover = mx >= x && mx <= x + w && my >= ry && my <= ry + h;
+            boolean hover    = mx >= x && mx <= x + w && my >= ry && my <= ry + h;
             boolean selected = sel == category;
-            float hov = hover ? 1F : 0F;
+            float   hov      = hover ? 1F : 0F;
 
-            fill(ms, x, ry, x+w, ry+h,
-                    withAlpha(blendColor(0xFF1A1730, 0xFF2B2550, selected?1F:hov), alpha*fade));
+            ThemeManager tm = ThemeManager.get();
+            int bgCol = selected ? tm.tabSel() : blendColor(tm.cardHover(), tm.cardOn(), hov);
+            fill(ms, x, ry, x+w, ry+h, withAlpha(bgCol, alpha*fade));
+
+            int accent = 0xFF000000 | (tm.accent() & 0xFFFFFF);
             if (selected) {
-                fill(ms, x, ry, x+3, ry+h, withAlpha(0xFF9B6DFF, alpha*fade));
-                fill(ms, x+3, ry, x+4, ry+h, withAlpha(0x409B6DFF, alpha*fade));
+                fill(ms, x, ry, x+3, ry+h, withAlpha(accent, alpha*fade));
+                fill(ms, x+3, ry, x+4, ry+h, withAlpha(0x40000000 | (tm.accent() & 0xFFFFFF), alpha*fade));
             } else if (hov > 0) {
-                fill(ms, x, ry, x+2, ry+h, withAlpha(0xFF604090, alpha*hov*fade));
+                fill(ms, x, ry, x+2, ry+h, withAlpha(accent, alpha*hov*fade*0.6F));
             }
             String label = category.name().charAt(0)
                     + category.name().substring(1).toLowerCase();
-            drawString(ms, font, label, x+10, ry+(h-8)/2,
-                    withAlpha(selected ? 0xFFE8D8FF : 0xFFCCCCCC, alpha*fade));
+            int textCol = selected
+                    ? (0xFF000000 | (tm.activeText() & 0xFFFFFF))
+                    : 0xFFCCCCCC;
+            drawString(ms, font, label, x+10, ry+(h-8)/2, withAlpha(textCol, alpha*fade));
         }
     }
 
@@ -434,6 +462,43 @@ public class MainMenuScreen extends Screen {
             font.drawShadow(ms,label, x+(w-font.width(label))/2, y+(h-8)/2, withAlpha(0xFFFFFFFF,alpha));
         }
     }
+
+    private class ThemeButton {
+        final int x, y, w, h;
+        ThemeButton(int x, int y, int w, int h) { this.x=x; this.y=y; this.w=w; this.h=h; }
+        boolean contains(double mx, double my) { return mx>=x&&mx<=x+w&&my>=y&&my<=y+h; }
+        void draw(MatrixStack ms, int mx, int my, float alpha) {
+            boolean hover = contains(mx, my);
+            ThemeManager tm = ThemeManager.get();
+            int accent = tm.accent();
+            int top = hover ? blendColor(tm.panelTop(), accent, 0.25F) : tm.panelTop();
+            int bot = hover ? blendColor(tm.panelBot(), accent, 0.15F) : tm.panelBot();
+            fillGradient(ms, x, y, x+w, y+h, withAlpha(top, alpha), withAlpha(bot, alpha));
+            fill(ms, x, y, x+w, y+1, withAlpha(accent, alpha * (hover ? 0.9F : 0.5F)));
+            String label = "\u25D0 " + ThemeManager.THEME_NAMES[tm.getCurrentThemeIndex()];
+            font.drawShadow(ms, label, x+(w-font.width(label))/2, y+(h-8)/2,
+                    withAlpha(0xFFFFFFFF, alpha));
+        }
+    }
+
+    private class HudEditButton {
+        final int x, y, w, h;
+        HudEditButton(int x, int y, int w, int h) { this.x=x; this.y=y; this.w=w; this.h=h; }
+        boolean contains(double mx, double my) { return mx>=x&&mx<=x+w&&my>=y&&my<=y+h; }
+        void draw(MatrixStack ms, int mx, int my, float alpha) {
+            boolean hover = contains(mx, my);
+            ThemeManager tm = ThemeManager.get();
+            int accent = tm.accent();
+            int top = hover ? blendColor(tm.panelTop(), accent, 0.25F) : tm.panelTop();
+            int bot = hover ? blendColor(tm.panelBot(), accent, 0.15F) : tm.panelBot();
+            fillGradient(ms, x, y, x+w, y+h, withAlpha(top, alpha), withAlpha(bot, alpha));
+            fill(ms, x, y, x+w, y+1, withAlpha(accent, alpha * (hover ? 0.9F : 0.5F)));
+            String label = "\u2750 HUD Edit";
+            font.drawShadow(ms, label, x+(w-font.width(label))/2, y+(h-8)/2,
+                    withAlpha(0xFFFFFFFF, alpha));
+        }
+    }
+
 
     // ---- Colour helpers --------------------------------------------------------
     private static int withAlpha(int argb, float alpha) {

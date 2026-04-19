@@ -4,12 +4,16 @@ import com.example.cosmetics.CosmeticsMod;
 import com.example.cosmetics.client.BindManager;
 import com.example.cosmetics.client.PanicManager;
 import com.example.cosmetics.auras.AuraTicker;
+import com.example.cosmetics.config.ConfigManager;
+import com.example.cosmetics.config.HudPositionManager;
 import com.example.cosmetics.effects.JumpCircles;
 import com.example.cosmetics.feature.FeatureType;
+import com.example.cosmetics.gui.HudEditScreen;
 import com.example.cosmetics.gui.MainMenuScreen;
 import com.example.cosmetics.hud.CosmeticsHud;
 import com.example.cosmetics.hud.TargetHud;
 import com.example.cosmetics.particles.ParticleManager;
+import com.example.cosmetics.render.CapeRenderer;
 import com.example.cosmetics.render.HandRenderer;
 import com.example.cosmetics.render.HatRenderer;
 import com.example.cosmetics.render.TrailRenderer;
@@ -47,6 +51,8 @@ public final class ClientEvents {
 
     public static void onClientSetup(FMLClientSetupEvent event) {
         KeyBindings.register();
+        ConfigManager.get().init();
+        ConfigManager.get().load();
     }
 
     // ---- Forge event bus ------------------------------------------------
@@ -58,7 +64,11 @@ public final class ClientEvents {
         if (mc.level == null || mc.player == null) return;
 
         while (KeyBindings.OPEN_MENU.consumeClick()) {
-            if (mc.screen == null) mc.setScreen(new MainMenuScreen());
+            if (mc.screen == null) {
+                mc.setScreen(new MainMenuScreen());
+            } else if (mc.screen instanceof MainMenuScreen) {
+                ConfigManager.get().save();
+            }
         }
 
         ParticleManager.get().tick();
@@ -69,6 +79,7 @@ public final class ClientEvents {
         detectJumpAndLanding(mc.player);
         UtilityHandler.get().tick();
         CombatHandler.get().tick();
+        CapeRenderer.get().tick();
         // Бинды на клавиши
         long win = mc.getWindow().getWindow();
         BindManager.get().tick(win);
@@ -116,6 +127,7 @@ public final class ClientEvents {
         TrailRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         WingsRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         HatRenderer.render(event.getMatrixStack(), event.getPartialTicks());
+        CapeRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         JumpCircles.get().renderAll(event.getMatrixStack(), event.getPartialTicks());
     }
 

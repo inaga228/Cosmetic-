@@ -1,6 +1,7 @@
 package com.example.cosmetics.hud;
 
 import com.example.cosmetics.client.CosmeticsState;
+import com.example.cosmetics.config.HudPositionManager;
 import com.example.cosmetics.feature.FeatureSettings;
 import com.example.cosmetics.feature.FeatureType;
 import com.example.cosmetics.gui.GuiDraw;
@@ -82,7 +83,8 @@ public final class TargetHud {
     private static void renderClassic(Minecraft mc, MatrixStack ms, LivingEntity draw) {
         int sw = mc.getWindow().getGuiScaledWidth();
         int w = 160, h = 44;
-        int x = (sw - w) / 2, y = 10;
+        int x = HudPositionManager.get().getTargetX(w);
+        int y = HudPositionManager.get().getTargetY();
 
         GuiDraw.roundedPanel(ms, x, y, w, h, shownAlpha);
 
@@ -107,7 +109,8 @@ public final class TargetHud {
     private static void renderSlim(Minecraft mc, MatrixStack ms, LivingEntity draw) {
         int sw = mc.getWindow().getGuiScaledWidth();
         int w = 140, h = 18;
-        int x = (sw - w) / 2, y = 10;
+        int x = HudPositionManager.get().getTargetX(w);
+        int y = HudPositionManager.get().getTargetY();
 
         int a = alpha255(1F);
         AbstractGui.fill(ms, x, y, x + w, y + h, (alpha255(0.85F) << 24) | 0x0E0E14);
@@ -123,7 +126,8 @@ public final class TargetHud {
     private static void renderNovus(Minecraft mc, MatrixStack ms, LivingEntity draw, FeatureSettings fs) {
         int sw = mc.getWindow().getGuiScaledWidth();
         int w = 200, h = 36;
-        int x = (sw - w) / 2, y = 8;
+        int x = HudPositionManager.get().getTargetX(w);
+        int y = HudPositionManager.get().getTargetY();
 
         int accent = accentFromColor(fs);
         GuiDraw.themedPanel(ms, x, y, w, h, shownAlpha, 0x101018, 0x08080E, accent);

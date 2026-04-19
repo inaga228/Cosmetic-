@@ -16,6 +16,7 @@ public enum FeatureType {
 
     // Wings
     DRAGON_WINGS ("Wings",          Category.WINGS,   Caps.COLOR | Caps.SIZE | Caps.SPEED | Caps.STYLE | Caps.OFFSET | Caps.BOOL),
+    CAPE         ("Cape",           Category.WINGS,   Caps.COLOR | Caps.SIZE | Caps.SPEED | Caps.STYLE | Caps.BOOL),
 
     // Effects
     JUMP_CIRCLES  ("Jump Circles",  Category.EFFECTS, Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.SPEED),
