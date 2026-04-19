@@ -53,7 +53,17 @@ public enum FeatureType {
     // Crit: forces crits by micro-jumping before each swing
     CRIT         ("Crit",         Category.COMBAT, 0),
     // Auto Clicker: COUNT = min CPS, SPEED = max CPS
-    AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED);
+    AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED),
+    // Smooth Aim: плавная наводка на ближайшего игрока. SIZE = FOV угол, SPEED = скорость
+    SMOOTH_AIM   ("Smooth Aim",   Category.COMBAT, Caps.SIZE | Caps.SPEED),
+    // Strafe: кружение вокруг цели Kill Aura. SPEED = скорость стрейфа
+    STRAFE       ("Strafe",       Category.COMBAT, Caps.SPEED),
+    // Anti Bot: фильтр ботов (не атакует без скина / без имени)
+    ANTI_BOT     ("Anti Bot",     Category.COMBAT, 0),
+    // Auto Pot: кидает зелье лечения под ноги при низком HP. COUNT = порог в сердцах
+    AUTO_POT     ("Auto Pot",     Category.COMBAT, Caps.COUNT),
+    // Auto Gap: ест золотое яблоко при низком HP. COUNT = порог в сердцах
+    AUTO_GAP     ("Auto Gap",     Category.COMBAT, Caps.COUNT);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 

@@ -67,7 +67,11 @@ public final class CosmeticsState {
                 s.style2     = 0;
                 s.extraFlags = 0x0A;  // weapon CD + hostile mobs
                 break;
-            case AUTO_CLICKER:  s.count = 8; s.speed = 12F; break;   // 8–12 CPS
+            case AUTO_CLICKER:  s.count = 8; s.speed = 12F; break;   // 8-12 CPS
+            case SMOOTH_AIM:    s.size = 90F; s.speed = 6F; break;    // FOV=90, speed=6
+            case STRAFE:        s.speed = 1.0F; break;
+            case AUTO_POT:      s.count = 8; break;   // 8 сердец = 16 HP
+            case AUTO_GAP:      s.count = 6; break;   // 6 сердец = 12 HP
 
             // HUDs — default to style 0 (classic neon-purple)
             case COSMETICS_HUD: s.colorR = 0.54F; s.colorG = 0.36F; s.colorB = 1.00F; s.style = 0; break;

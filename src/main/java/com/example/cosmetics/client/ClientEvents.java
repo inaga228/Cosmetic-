@@ -1,6 +1,8 @@
 package com.example.cosmetics.client;
 
 import com.example.cosmetics.CosmeticsMod;
+import com.example.cosmetics.client.BindManager;
+import com.example.cosmetics.client.PanicManager;
 import com.example.cosmetics.auras.AuraTicker;
 import com.example.cosmetics.effects.JumpCircles;
 import com.example.cosmetics.feature.FeatureType;
@@ -30,6 +32,8 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.client.event.ClientChatEvent;
+import net.minecraft.util.text.StringTextComponent;
 
 @Mod.EventBusSubscriber(modid = CosmeticsMod.MOD_ID, value = Dist.CLIENT)
 public final class ClientEvents {
@@ -65,6 +69,9 @@ public final class ClientEvents {
         detectJumpAndLanding(mc.player);
         UtilityHandler.get().tick();
         CombatHandler.get().tick();
+        // Бинды на клавиши
+        long win = mc.getWindow().getWindow();
+        BindManager.get().tick(win);
     }
 
     private static void detectJumpAndLanding(ClientPlayerEntity player) {
@@ -135,6 +142,23 @@ public final class ClientEvents {
             if (CosmeticsState.get().isOn(FeatureType.CUSTOM_PLACE)) {
                 HandRenderer.triggerPlaceAnim();
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onChat(ClientChatEvent event) {
+        String msg = event.getMessage().trim();
+        if (!msg.equalsIgnoreCase(".panic")) return;
+
+        event.setCanceled(true); // не отправлять в чат
+
+        boolean active = PanicManager.get().toggle();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            String text = active
+                ? "§c[Cosmetics] PANIC ON — combat выключен"
+                : "§a[Cosmetics] PANIC OFF — всё вернулось";
+            mc.player.displayClientMessage(new StringTextComponent(text), false);
         }
     }
 

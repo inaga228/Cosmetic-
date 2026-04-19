@@ -16,6 +16,17 @@ import net.minecraft.util.Hand;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import net.minecraft.item.Items;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.Effects;
+import net.minecraft.potion.EffectInstance;
+import net.minecraft.potion.Potion;
+import net.minecraft.potion.Potions;
+import net.minecraft.util.NonNullList;
+import net.minecraft.network.play.client.CHeldItemChangePacket;
+import net.minecraft.util.math.vector.Vector3d;
+import net.minecraft.util.math.MathHelper;
+import com.example.cosmetics.client.BindManager;
 
 /**
  * Combat utility features:
@@ -69,6 +80,17 @@ public final class CombatHandler {
     private int clickerTick     = 0;
     private int clickerInterval = 4;
 
+    // ---- Smooth Aim state -------------------------------------------------------
+    private float smoothYaw   = 0;
+    private float smoothPitch = 0;
+
+    // ---- Strafe state -----------------------------------------------------------
+    private double strafeAngle = 0;
+
+    // ---- Auto Pot / Auto Gap state ---------------------------------------------
+    private int potCooldown = 0;
+    private int gapCooldown = 0;
+
     private CombatHandler() {}
 
     // ============================================================
@@ -80,8 +102,13 @@ public final class CombatHandler {
         tickNoFireOverlay(player);
         tickKillAura(mc, player);
         tickAutoClicker(mc, player);
+        tickSmoothAim(mc, player);
+        tickStrafe(mc, player);
+        tickAutoPot(mc, player);
+        tickAutoGap(mc, player);
+        if (potCooldown > 0) potCooldown--;
+        if (gapCooldown > 0) gapCooldown--;
         // standalone Crit (without Kill Aura) handled inside tickKillAura
-        // and also standalone below
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
             tickStandaloneCrit(player);
         }
@@ -242,6 +269,21 @@ public final class CombatHandler {
         if (e == player)   return false;
         if (!e.isAlive())  return false;
 
+        // Anti Bot: пропускаем сущности без имени или невидимые (типичные боты)
+        if (CosmeticsState.get().isOn(FeatureType.ANTI_BOT)) {
+            if (e instanceof PlayerEntity) {
+                // Боты обычно: нет скина (невозможно проверить на клиенте надёжно),
+                // зато часто невидимы или имеют пустое отображаемое имя
+                if (e.isInvisible()) return false;
+                if (e.getName().getString().isEmpty()) return false;
+                // Боты часто не двигаются — проверяем дельту движения
+                double motion = e.getDeltaMovement().lengthSqr();
+                // Полностью статичные сущности (motion == 0 несколько тиков) — пропускаем
+                // (упрощённая проверка: если совсем нет движения и нет имени над головой)
+                if (motion == 0 && !e.hasCustomName()) return false;
+            }
+        }
+
         boolean wantPlayers  = (flags & 0x04) != 0;
         boolean wantHostile  = (flags & 0x08) != 0;
         boolean wantPassive  = (flags & 0x10) != 0;
@@ -295,6 +337,226 @@ public final class CombatHandler {
             clickerInterval = Math.max(1, 20 / cps);
             KeyBinding.click(mc.options.keyAttack.getKey());
         }
+    }
+
+    // ============================================================
+    // SMOOTH AIM — плавная наводка на ближайшего игрока
+    // ============================================================
+    private void tickSmoothAim(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.SMOOTH_AIM)) return;
+        if (mc.screen != null) return;
+
+        com.example.cosmetics.feature.FeatureSettings fs =
+                CosmeticsState.get().settings(FeatureType.SMOOTH_AIM);
+        float fov   = Math.max(10F, Math.min(180F, fs.size));   // угол поиска
+        float speed = Math.max(1F,  Math.min(20F,  fs.speed));  // скорость наводки
+
+        // Ищем ближайшего игрока в FOV
+        PlayerEntity target = null;
+        double bestDist = Double.MAX_VALUE;
+        for (net.minecraft.entity.Entity e : mc.level.entitiesForRendering()) {
+            if (!(e instanceof PlayerEntity)) continue;
+            if (e == player) continue;
+            if (!e.isAlive()) continue;
+
+            double dx = e.getX() - player.getX();
+            double dy = (e.getY() + e.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
+            double dz = e.getZ() - player.getZ();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+
+            // Угол между направлением взгляда и целью
+            float needYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+            float needPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
+            float dYaw   = Math.abs(wrapDegrees(needYaw - player.yRot));
+            float dPitch = Math.abs(needPitch - player.xRot);
+
+            if (dYaw > fov / 2F || dPitch > fov / 2F) continue;
+            if (dist < bestDist) { bestDist = dist; target = (PlayerEntity) e; }
+        }
+
+        if (target == null) return;
+
+        double dx = target.getX() - player.getX();
+        double dy = (target.getY() + target.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
+        double dz = target.getZ() - player.getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+
+        float targetYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float targetPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
+
+        // Плавное движение к цели
+        float lerpT = speed / 20F;
+        player.yRot = lerpAngle(player.yRot, targetYaw, lerpT);
+        player.xRot = lerp(player.xRot, targetPitch, lerpT);
+        player.xRot = Math.max(-90F, Math.min(90F, player.xRot));
+    }
+
+    private static float lerpAngle(float from, float to, float t) {
+        float diff = wrapDegrees(to - from);
+        return from + diff * t;
+    }
+
+    private static float lerp(float a, float b, float t) {
+        return a + (b - a) * t;
+    }
+
+    private static float wrapDegrees(float deg) {
+        deg = deg % 360F;
+        if (deg >= 180F)  deg -= 360F;
+        if (deg < -180F)  deg += 360F;
+        return deg;
+    }
+
+    // ============================================================
+    // STRAFE — кружение вокруг ближайшей цели Kill Aura
+    // ============================================================
+    private void tickStrafe(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.STRAFE)) return;
+        if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) return;
+        if (mc.screen != null) return;
+
+        com.example.cosmetics.feature.FeatureSettings fs =
+                CosmeticsState.get().settings(FeatureType.STRAFE);
+        float speed = Math.max(0.5F, Math.min(5F, fs.speed));
+
+        // Находим ту же цель что и Kill Aura (ближайшую)
+        com.example.cosmetics.feature.FeatureSettings kaFs =
+                CosmeticsState.get().settings(FeatureType.KILL_AURA);
+        float range = Math.max(0.5F, Math.min(10F, kaFs.size));
+        int flags = kaFs.extraFlags;
+
+        List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
+                LivingEntity.class,
+                player.getBoundingBox().inflate(range),
+                e -> isValidTarget(e, player, flags));
+        if (candidates.isEmpty()) return;
+
+        LivingEntity target = candidates.stream()
+                .min(Comparator.comparingDouble(e -> e.distanceToSqr(player)))
+                .orElse(null);
+        if (target == null) return;
+
+        // Вращаем угол и двигаемся по окружности вокруг цели
+        strafeAngle += speed * 0.05;
+        double radius = Math.max(2.0, range * 0.6);
+        double tx = target.getX() + Math.cos(strafeAngle) * radius;
+        double tz = target.getZ() + Math.sin(strafeAngle) * radius;
+
+        double moveX = tx - player.getX();
+        double moveZ = tz - player.getZ();
+        double len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+        if (len > 0.01) {
+            moveX /= len;
+            moveZ /= len;
+            player.setDeltaMovement(
+                    moveX * 0.28,
+                    player.getDeltaMovement().y,
+                    moveZ * 0.28);
+        }
+    }
+
+    // ============================================================
+    // ANTI BOT — фильтр ботов (используется в isValidTarget)
+    // ============================================================
+    // Интегрирован в isValidTarget ниже через флаг ANTI_BOT
+
+    // ============================================================
+    // AUTO POT — бросить зелье лечения при низком HP
+    // ============================================================
+    private void tickAutoPot(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.AUTO_POT)) return;
+        if (potCooldown > 0) return;
+
+        com.example.cosmetics.feature.FeatureSettings fs =
+                CosmeticsState.get().settings(FeatureType.AUTO_POT);
+        float threshold = fs.count * 2F; // сердца -> HP
+
+        if (player.getHealth() >= player.getMaxHealth() - 0.5F) return;
+        if (player.getHealth() > threshold) return;
+
+        // Ищем зелье лечения в инвентаре (splash или обычное)
+        NonNullList<ItemStack> inv = player.inventory.items;
+        int potSlot = -1;
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack stack = inv.get(i);
+            if (stack.getItem() == Items.SPLASH_POTION || stack.getItem() == Items.LINGERING_POTION) {
+                net.minecraft.potion.Potion pot = net.minecraft.item.PotionUtils.getPotion(stack);
+                if (pot == Potions.HEALING || pot == Potions.STRONG_HEALING) {
+                    potSlot = i; break;
+                }
+                // Проверяем кастомные зелья с эффектом лечения
+                for (net.minecraft.potion.EffectInstance eff : net.minecraft.item.PotionUtils.getMobEffects(stack)) {
+                    if (eff.getEffect() == net.minecraft.potion.Effects.HEAL) { potSlot = i; break; }
+                }
+                if (potSlot != -1) break;
+            }
+        }
+        if (potSlot == -1) return;
+
+        int prev = player.inventory.selected;
+        int hotbarSlot = potSlot < 9 ? potSlot : 0;
+
+        // Если зелье не в хотбаре — временно свапаем
+        if (potSlot >= 9) {
+            ItemStack tmp = inv.get(hotbarSlot).copy();
+            inv.set(hotbarSlot, inv.get(potSlot).copy());
+            inv.set(potSlot, tmp.isEmpty() ? ItemStack.EMPTY : tmp);
+        }
+
+        player.inventory.selected = hotbarSlot;
+        mc.getConnection().send(new CHeldItemChangePacket(hotbarSlot));
+        // Бросить зелье (правая кнопка мыши)
+        mc.gameMode.useItem(player, mc.level, Hand.MAIN_HAND);
+
+        // Восстанавливаем слот
+        player.inventory.selected = prev;
+        mc.getConnection().send(new CHeldItemChangePacket(prev));
+
+        potCooldown = 20; // кулдаун 1 секунда
+    }
+
+    // ============================================================
+    // AUTO GAP — съесть золотое яблоко при низком HP
+    // ============================================================
+    private void tickAutoGap(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.AUTO_GAP)) return;
+        if (gapCooldown > 0) return;
+
+        com.example.cosmetics.feature.FeatureSettings fs =
+                CosmeticsState.get().settings(FeatureType.AUTO_GAP);
+        float threshold = fs.count * 2F;
+
+        if (player.getHealth() > threshold) return;
+
+        // Ищем золотое яблоко (обычное или зачарованное)
+        NonNullList<ItemStack> inv = player.inventory.items;
+        int gapSlot = -1;
+        for (int i = 0; i < inv.size(); i++) {
+            net.minecraft.item.Item item = inv.get(i).getItem();
+            if (item == Items.GOLDEN_APPLE || item == Items.ENCHANTED_GOLDEN_APPLE) {
+                gapSlot = i; break;
+            }
+        }
+        if (gapSlot == -1) return;
+
+        int prev = player.inventory.selected;
+        int hotbarSlot = gapSlot < 9 ? gapSlot : 0;
+
+        if (gapSlot >= 9) {
+            ItemStack tmp = inv.get(hotbarSlot).copy();
+            inv.set(hotbarSlot, inv.get(gapSlot).copy());
+            inv.set(gapSlot, tmp.isEmpty() ? ItemStack.EMPTY : tmp);
+        }
+
+        player.inventory.selected = hotbarSlot;
+        mc.getConnection().send(new CHeldItemChangePacket(hotbarSlot));
+        // Начинаем есть (удерживаем ПКМ — один тик достаточно для инициации)
+        mc.gameMode.useItem(player, mc.level, Hand.MAIN_HAND);
+
+        player.inventory.selected = prev;
+        mc.getConnection().send(new CHeldItemChangePacket(prev));
+
+        gapCooldown = 40; // кулдаун 2 секунды
     }
 
     public static boolean shouldSuppressFireOverlay() {
