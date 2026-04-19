@@ -45,7 +45,12 @@ public enum FeatureType {
     // AUTO_TOTEM: count = HP threshold in hearts
     AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT),
     // FAST_PLACE: count = delay-reset repeats per tick (1 = vanilla fast, 10 = max)
-    FAST_PLACE   ("Fast Place",     Category.UTILITY, Caps.COUNT);
+    FAST_PLACE   ("Fast Place",     Category.UTILITY, Caps.COUNT),
+
+    // Combat helpers
+    AUTO_BLOCK      ("Auto Block",       Category.COMBAT, 0),
+    NO_HURT_CAM     ("No Hurt Cam",      Category.COMBAT, 0),
+    NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
