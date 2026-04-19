@@ -13,6 +13,8 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.RayTraceResult;
 
+import java.lang.reflect.Field;
+
 /**
  * Handles all non-visual utility features:
  *  - Auto Sprint
@@ -29,6 +31,36 @@ public final class UtilityHandler {
 
     // Fast Place
     private int placeTimer = 0;
+
+    /**
+     * Reflected reference to Minecraft.rightClickDelay.
+     * In 1.16.5 official Mojang mappings this field is private, so we access
+     * it via reflection once and cache the Field object for performance.
+     *
+     * Possible field names depending on mapping layer:
+     *   official / Mojang : "rightClickDelay"
+     *   srg / MCP         : "field_71467_aa" (srg name as fallback)
+     */
+    private static final Field RIGHT_CLICK_DELAY_FIELD;
+    static {
+        Field f = null;
+        for (String name : new String[]{ "rightClickDelay", "field_71467_aa" }) {
+            try {
+                f = Minecraft.class.getDeclaredField(name);
+                f.setAccessible(true);
+                break;
+            } catch (NoSuchFieldException ignored) {}
+        }
+        RIGHT_CLICK_DELAY_FIELD = f; // null if neither name matched (shouldn't happen)
+    }
+
+    /** Sets Minecraft.rightClickDelay to 0 via reflection. */
+    private static void resetRightClickDelay(Minecraft mc) {
+        if (RIGHT_CLICK_DELAY_FIELD == null) return;
+        try {
+            RIGHT_CLICK_DELAY_FIELD.setInt(mc, 0);
+        } catch (IllegalAccessException ignored) {}
+    }
 
     // Fullbright: remember original gamma so we can restore it on disable.
     private float originalGamma = -1F;
@@ -179,6 +211,7 @@ public final class UtilityHandler {
         }
 
         // Zero the placement cooldown — vanilla handles the actual placement.
-        mc.rightClickDelay = 0;
+        // rightClickDelay is private in 1.16.5 official mappings, so we use reflection.
+        resetRightClickDelay(mc);
     }
 }
