@@ -5,17 +5,18 @@ import com.example.cosmetics.feature.FeatureSettings;
 import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
+import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityClassification;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.PotionUtils;
-import net.minecraft.entity.Entity;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.EffectInstance;
+import net.minecraft.item.Items;
 import net.minecraft.network.play.client.CHeldItemChangePacket;
+import net.minecraft.potion.EffectInstance;
 import net.minecraft.potion.Effects;
+import net.minecraft.potion.Potion;
+import net.minecraft.potion.PotionUtils;
 import net.minecraft.potion.Potions;
 import net.minecraft.util.Hand;
 import net.minecraft.util.NonNullList;
@@ -421,22 +422,22 @@ public final class CombatHandler {
         if (player.getHealth() >= player.getMaxHealth() - 0.5F) return;
         if (player.getHealth() > threshold) return;
 
-        // Ищем зелье лечения в инвентаре (splash или обычное)
+        // Ищем splash/lingering зелье лечения в инвентаре
         NonNullList<ItemStack> inv = player.inventory.items;
         int potSlot = -1;
         for (int i = 0; i < inv.size(); i++) {
             ItemStack stack = inv.get(i);
-            if (stack.getItem() == Items.SPLASH_POTION || stack.getItem() == Items.LINGERING_POTION) {
-                Potion pot = PotionUtils.getPotion(stack);
-                if (pot == Potions.HEALING || pot == Potions.STRONG_HEALING) {
-                    potSlot = i; break;
-                }
-                // Проверяем кастомные зелья с эффектом лечения
-                for (EffectInstance eff : PotionUtils.getMobEffects(stack)) {
-                    if (eff.getEffect() == Effects.HEAL) { potSlot = i; break; }
-                }
-                if (potSlot != -1) break;
+            // В 1.16.5: Items.SPLASH_POTION и LINGERING_POTION это отдельные предметы
+            net.minecraft.item.Item it = stack.getItem();
+            if (it != Items.SPLASH_POTION && it != Items.LINGERING_POTION) continue;
+            Potion pot = PotionUtils.getPotion(stack);
+            if (pot == Potions.HEALING || pot == Potions.STRONG_HEALING) {
+                potSlot = i; break;
             }
+            for (EffectInstance eff : PotionUtils.getMobEffects(stack)) {
+                if (eff.getEffect() == Effects.HEAL) { potSlot = i; break; }
+            }
+            if (potSlot != -1) break;
         }
         if (potSlot == -1) return;
 
