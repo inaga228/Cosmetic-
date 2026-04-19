@@ -27,7 +27,6 @@ import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -103,17 +102,6 @@ public final class ClientEvents {
         TargetHud.render(event.getMatrixStack(), event.getPartialTicks());
     }
 
-    /**
-     * No Fire Overlay — cancel the FIRE overlay element before it renders.
-     */
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void onRenderOverlayPre(RenderGameOverlayEvent.Pre event) {
-        if (event.getType() == RenderGameOverlayEvent.ElementType.FIRE) {
-            if (CombatHandler.shouldSuppressFireOverlay()) {
-                event.setCanceled(true);
-            }
-        }
-    }
 
     @SubscribeEvent
     public static void onRenderWorldLast(RenderWorldLastEvent event) {

@@ -37,6 +37,20 @@ public final class CombatHandler {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
         tickAutoBlock(mc, mc.player);
+        tickNoFireOverlay(mc.player);
+    }
+
+    // -------------------------------------------------------------------------
+    // No Fire Overlay
+    // Vanilla renders fire on screen when player.getRemainingFireTicks() > 0.
+    // We zero the visual fire ticks client-side each tick — damage is already
+    // applied server-side so this only removes the overlay, not the damage.
+    // -------------------------------------------------------------------------
+    private static void tickNoFireOverlay(net.minecraft.client.entity.player.ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) return;
+        if (player.getRemainingFireTicks() > 0) {
+            player.setRemainingFireTicks(0);
+        }
     }
 
 
