@@ -5,20 +5,20 @@ package com.example.cosmetics.feature;
  * Each value groups which settings fields are relevant for its settings screen.
  */
 public enum FeatureType {
-    // Trails (now rendered as a 3D ribbon, not particles)
+    // Trails
     RAINBOW_TRAIL("Rainbow Trail",  Category.TRAILS,  Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED | Caps.STYLE),
     FLAME_TRAIL  ("Flame Trail",    Category.TRAILS,  Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED | Caps.STYLE),
     GALAXY_TRAIL ("Galaxy Trail",   Category.TRAILS,  Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED | Caps.STYLE),
 
-    // Auras / particles around player
+    // Auras
     AURA        ("Aura",            Category.PARTICLES, Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED),
     SNOW_AURA   ("Snow Aura",       Category.PARTICLES, Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED),
     HEART_AURA  ("Hearts",          Category.PARTICLES, Caps.COLOR | Caps.SIZE | Caps.DENSITY | Caps.SPEED),
 
-    // Hat (hidden in first-person to keep view clear)
+    // Hat
     CHINA_HAT   ("China Hat",       Category.HAT,     Caps.COLOR | Caps.SIZE | Caps.STYLE | Caps.OFFSET),
 
-    // Wings (flap anim driven by player speed).
+    // Wings
     DRAGON_WINGS ("Wings",          Category.WINGS,   Caps.COLOR | Caps.SIZE | Caps.SPEED | Caps.STYLE | Caps.OFFSET),
 
     // Movement effects
@@ -37,32 +37,30 @@ public enum FeatureType {
     CUSTOM_ATTACK    ("Custom Attack Anim",  Category.ANIM, Caps.SIZE),
     CUSTOM_PLACE     ("Custom Place Anim",   Category.ANIM, Caps.SIZE),
 
-    // Utility — no visual, pure gameplay helpers
+    // Utility
     AUTO_SPRINT  ("Auto Sprint",    Category.UTILITY, 0),
     AUTO_JUMP    ("Auto Jump",      Category.UTILITY, 0),
     AUTO_SNEAK   ("Auto Sneak",     Category.UTILITY, 0),
     FULLBRIGHT   ("Fullbright",     Category.UTILITY, 0),
-    // AUTO_TOTEM: count = HP threshold in hearts
     AUTO_TOTEM   ("Auto Totem",     Category.UTILITY, Caps.COUNT),
 
-    // Combat helpers
+    // Combat
     NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0),
 
-    // Kill Aura: SPEED = attack delay ticks, SIZE = range, STYLE = camera mode, COUNT = sort mode
-    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SPEED | Caps.SIZE | Caps.STYLE | Caps.COUNT),
-    // Crit: forces crits by micro-jumping before each swing
+    // Kill Aura: SIZE = range, COUNT = sort mode
+    // SPEED removed: attack fires automatically on weapon cooldown
+    // Rotation mode and target toggles shown as CycleButton / ToggleButton
+    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SIZE | Caps.BOOL),
+
     CRIT         ("Crit",         Category.COMBAT, 0),
-    // Auto Clicker: COUNT = min CPS, SPEED = max CPS
     AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED),
-    // Smooth Aim: плавная наводка на ближайшего игрока. SIZE = FOV угол, SPEED = скорость
+
+    // Smooth Aim: now only FOV setting (no speed slider — instant aim handled separately)
     SMOOTH_AIM   ("Smooth Aim",   Category.COMBAT, Caps.SIZE | Caps.SPEED),
-    // Strafe: кружение вокруг цели Kill Aura. SPEED = скорость стрейфа
+
     STRAFE       ("Strafe",       Category.COMBAT, Caps.SPEED),
-    // Anti Bot: фильтр ботов (не атакует без скина / без имени)
     ANTI_BOT     ("Anti Bot",     Category.COMBAT, 0),
-    // Auto Pot: кидает зелье лечения под ноги при низком HP. COUNT = порог в сердцах
     AUTO_POT     ("Auto Pot",     Category.COMBAT, Caps.COUNT),
-    // Auto Gap: ест золотое яблоко при низком HP. COUNT = порог в сердцах
     AUTO_GAP     ("Auto Gap",     Category.COMBAT, Caps.COUNT);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
@@ -77,6 +75,8 @@ public enum FeatureType {
         public static final int COUNT    = 1 << 5;
         public static final int OFFSET   = 1 << 6;
         public static final int ROTATION = 1 << 7;
+        /** Feature has boolean toggle settings (ToggleButton / CycleButton widgets). */
+        public static final int BOOL     = 1 << 8;
     }
 
     public final String displayName;
