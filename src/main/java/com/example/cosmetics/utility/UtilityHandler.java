@@ -17,8 +17,6 @@ import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 
-import java.lang.reflect.Field;
-
 /**
  * Handles all non-visual utility features:
  *  - Auto Sprint
@@ -249,9 +247,19 @@ public final class UtilityHandler {
 
     // -------------------------------------------------------------------------
     // Fast Place
+    //
+    // Simulates repeated right-click presses via KeyBinding.click() while the
+    // player holds RMB on a block with a block item. This is equivalent to the
+    // player clicking very fast themselves — no reflection, no packet hacks.
+    // placeTimer throttles the rate: fires every FAST_PLACE_INTERVAL ticks.
     // -------------------------------------------------------------------------
+    private static final int FAST_PLACE_INTERVAL = 2; // click every 2 ticks = 10 clicks/sec
+
     private void tickFastPlace(Minecraft mc, ClientPlayerEntity player, CosmeticsState state) {
-        if (!state.isOn(FeatureType.FAST_PLACE)) return;
+        if (!state.isOn(FeatureType.FAST_PLACE)) {
+            placeTimer = 0;
+            return;
+        }
 
         if (!mc.options.keyUse.isDown()) {
             placeTimer = 0;
@@ -272,6 +280,11 @@ public final class UtilityHandler {
             return;
         }
 
-        resetRightClickDelay(mc);
+        placeTimer++;
+        if (placeTimer >= FAST_PLACE_INTERVAL) {
+            placeTimer = 0;
+            // Simulate an extra right-click — vanilla handles the actual placement
+            mc.options.keyUse.click();
+        }
     }
 }
