@@ -5,28 +5,24 @@ import com.example.cosmetics.feature.FeatureSettings;
 import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.EntityClassification;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.PotionUtils;
+import net.minecraft.entity.Entity;
+import net.minecraft.potion.Potion;
+import net.minecraft.potion.EffectInstance;
+import net.minecraft.network.play.client.CHeldItemChangePacket;
+import net.minecraft.potion.Effects;
+import net.minecraft.potion.Potions;
 import net.minecraft.util.Hand;
+import net.minecraft.util.NonNullList;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
-import net.minecraft.item.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.Effects;
-import net.minecraft.potion.EffectInstance;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.Potions;
-import net.minecraft.util.NonNullList;
-import net.minecraft.network.play.client.CHeldItemChangePacket;
-import net.minecraft.util.math.vector.Vector3d;
-import net.minecraft.util.math.MathHelper;
-import com.example.cosmetics.client.BindManager;
 
 /**
  * Combat utility features:
@@ -67,10 +63,8 @@ public final class CombatHandler {
     private static final Random RNG = new Random();
 
     // ---- Kill Aura state -------------------------------------------------------
-    private int    auraCooldown   = 0;
-    private float  savedYaw       = 0;   // player's own view yaw when BODY_TRACK
-    private float  savedPitch     = 0;
-    private boolean auraWasActive = false;
+    private int   auraCooldown = 0;
+    private float bodyYawSmooth = 0;  // плавный поворот тела
 
     // ---- Crit state ------------------------------------------------------------
     private int critJumpedTick = -999; // game tick when micro-jump was issued
@@ -127,31 +121,17 @@ public final class CombatHandler {
     // ============================================================
     private void tickKillAura(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
-            // Restore view if we were rotating it
-            if (auraWasActive) {
-                player.yRot  = savedYaw;
-                player.xRot  = savedPitch;
-                auraWasActive = false;
-            }
             auraCooldown = 0;
             return;
         }
 
         FeatureSettings fs  = CosmeticsState.get().settings(FeatureType.KILL_AURA);
-        int   camMode       = Math.floorMod(fs.style, 3);
         int   flags         = fs.extraFlags;
         int   sortMode      = Math.floorMod(fs.count, 3);
         float range         = Math.max(0.5F, Math.min(10F, fs.size));
         int   minDelay      = Math.max(1, (int) fs.speed);
         boolean useWeaponCD = (flags & 0x01) != 0;
         boolean autoCrit    = (flags & 0x02) != 0;
-
-        // Save the player's own mouse-look so we can restore it in BODY_TRACK
-        if (!auraWasActive) {
-            savedYaw   = player.yRot;
-            savedPitch = player.xRot;
-        }
-        auraWasActive = true;
 
         // ---- Find target -------------------------------------------------------
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
@@ -160,11 +140,6 @@ public final class CombatHandler {
                 e -> isValidTarget(e, player, flags));
 
         if (candidates.isEmpty()) {
-            // Restore rotation when no targets
-            if (camMode == 0) {
-                player.yRot = savedYaw;
-                player.xRot = savedPitch;
-            }
             auraCooldown = 0;
             return;
         }
@@ -172,8 +147,14 @@ public final class CombatHandler {
         LivingEntity target = pickTarget(candidates, player, sortMode);
         if (target == null) return;
 
-        // ---- Rotation ----------------------------------------------------------
-        applyRotation(player, target, camMode);
+        // ---- Плавный поворот тела к цели (не трогаем камеру!) -----------------
+        double dx  = target.getX() - player.getX();
+        double dz  = target.getZ() - player.getZ();
+        float wantYaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        bodyYawSmooth = lerpAngle(bodyYawSmooth, wantYaw, 0.15F);
+        player.yBodyRot = bodyYawSmooth;
+        player.yHeadRot = bodyYawSmooth;
+        // yRot и xRot (камера) — не трогаем!
 
         // ---- Cooldown ----------------------------------------------------------
         if (auraCooldown > 0) {
@@ -184,7 +165,7 @@ public final class CombatHandler {
         // ---- Weapon charge gate ------------------------------------------------
         if (useWeaponCD && player.getAttackStrengthScale(0F) < 1.0F) return;
 
-        // ---- Auto Crit: micro-jump one tick before attack ----------------------
+        // ---- Auto Crit: micro-jump перед ударом --------------------------------
         if (autoCrit) {
             boolean canCrit = player.isOnGround()
                     && !player.isCrouching()
@@ -194,16 +175,14 @@ public final class CombatHandler {
             if (canCrit) {
                 int currentTick = (int)(mc.level.getGameTime() & 0x7FFFFFFF);
                 if (currentTick != critJumpedTick) {
-                    // Issue micro-jump; real attack next tick when airborne
                     player.setDeltaMovement(
                             player.getDeltaMovement().x,
                             0.11,
                             player.getDeltaMovement().z);
                     critJumpedTick = currentTick;
-                    auraCooldown = 1; // wait one tick → airborne → crit
+                    auraCooldown = 1;
                     return;
                 }
-                // Second tick: still mark not on ground → vanilla crit fires
             }
         }
 
@@ -211,38 +190,6 @@ public final class CombatHandler {
         mc.gameMode.attack(player, target);
         player.swing(Hand.MAIN_HAND);
         auraCooldown = minDelay;
-    }
-
-    // ---- Rotation helper -------------------------------------------------------
-    private void applyRotation(ClientPlayerEntity player, LivingEntity target, int camMode) {
-        if (camMode == 2) return; // SILENT — no rotation
-
-        double dx   = target.getX() - player.getX();
-        double dy   = (target.getY() + target.getBbHeight() * 0.5)
-                    - (player.getY() + player.getEyeHeight());
-        double dz   = target.getZ() - player.getZ();
-        double dist = Math.sqrt(dx * dx + dz * dz);
-
-        float targetYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float targetPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
-
-        if (camMode == 0) {
-            // BODY_TRACK: body + head snap, but camera (xRot/yRot used for view)
-            // stays at savedYaw / savedPitch so 1st-person view is free.
-            // In 3rd-person the model visibly faces the enemy.
-            player.yBodyRot  = targetYaw;
-            player.yHeadRot  = targetYaw;
-            // Update saved values from current mouse input each tick
-            savedYaw   = player.yRot;
-            savedPitch = player.xRot;
-            // Do NOT touch player.yRot / player.xRot → free look
-        } else {
-            // FULL_LOCK: camera also snaps
-            player.yRot      = targetYaw;
-            player.xRot      = targetPitch;
-            player.yBodyRot  = targetYaw;
-            player.yHeadRot  = targetYaw;
-        }
     }
 
     // ---- Target picker ---------------------------------------------------------
@@ -354,7 +301,7 @@ public final class CombatHandler {
         // Ищем ближайшего игрока в FOV
         PlayerEntity target = null;
         double bestDist = Double.MAX_VALUE;
-        for (net.minecraft.entity.Entity e : mc.level.entitiesForRendering()) {
+        for (Entity e : mc.level.entitiesForRendering()) {
             if (!(e instanceof PlayerEntity)) continue;
             if (e == player) continue;
             if (!e.isAlive()) continue;
@@ -480,13 +427,13 @@ public final class CombatHandler {
         for (int i = 0; i < inv.size(); i++) {
             ItemStack stack = inv.get(i);
             if (stack.getItem() == Items.SPLASH_POTION || stack.getItem() == Items.LINGERING_POTION) {
-                net.minecraft.potion.Potion pot = net.minecraft.item.PotionUtils.getPotion(stack);
+                Potion pot = PotionUtils.getPotion(stack);
                 if (pot == Potions.HEALING || pot == Potions.STRONG_HEALING) {
                     potSlot = i; break;
                 }
                 // Проверяем кастомные зелья с эффектом лечения
-                for (net.minecraft.potion.EffectInstance eff : net.minecraft.item.PotionUtils.getMobEffects(stack)) {
-                    if (eff.getEffect() == net.minecraft.potion.Effects.HEAL) { potSlot = i; break; }
+                for (EffectInstance eff : PotionUtils.getMobEffects(stack)) {
+                    if (eff.getEffect() == Effects.HEAL) { potSlot = i; break; }
                 }
                 if (potSlot != -1) break;
             }
@@ -532,8 +479,7 @@ public final class CombatHandler {
         NonNullList<ItemStack> inv = player.inventory.items;
         int gapSlot = -1;
         for (int i = 0; i < inv.size(); i++) {
-            net.minecraft.item.Item item = inv.get(i).getItem();
-            if (item == Items.GOLDEN_APPLE || item == Items.ENCHANTED_GOLDEN_APPLE) {
+            if (inv.get(i).getItem() == Items.GOLDEN_APPLE || inv.get(i).getItem() == Items.ENCHANTED_GOLDEN_APPLE) {
                 gapSlot = i; break;
             }
         }

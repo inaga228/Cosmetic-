@@ -257,8 +257,9 @@ public class MainMenuScreen extends Screen {
         for (int i = 0; i < visibleFeatures.size(); i++) {
             FeatureType f = visibleFeatures.get(i);
             int cy = cardY + i * (CARD_H + CARD_GAP) - scroll;
-            if (mx >= cardX && mx <= cardX + cardW && my >= cy && my <= cy + CARD_H
-                    && cy >= cardY && cy + CARD_H <= cardY + cardAreaH) {
+            // Только проверяем что карточка видима (хоть частично в зоне)
+            if (cy + CARD_H < cardY || cy > cardY + cardAreaH) continue;
+            if (mx >= cardX && mx <= cardX + cardW && my >= cy && my <= cy + CARD_H) {
                 if (button == 0) {
                     CosmeticsState.get().toggle(f);
                 } else if (button == 1) {
