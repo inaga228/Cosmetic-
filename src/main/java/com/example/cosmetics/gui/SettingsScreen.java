@@ -262,8 +262,22 @@ public class SettingsScreen extends Screen {
         for (CycleButton c : cycles)   c.draw(ms, anim);
 
         int hintA = Math.max(0, Math.min(255, (int)(anim * 140)));
+
+        // Bind Key button (bottom-left of panel)
+        int bx = px + 10, by = py + panelH - 22, bw = 80, bh = 14;
+        int bindKey = com.example.cosmetics.client.BindManager.get().getBind(feature);
+        String bindLabel = "Bind: " + com.example.cosmetics.client.BindManager.keyName(bindKey);
+        net.minecraft.client.gui.AbstractGui.fill(ms, bx, by, bx + bw, by + bh,
+                (hintA << 24) | 0x2A1E5A);
+        net.minecraft.client.gui.AbstractGui.fill(ms, bx, by, bx + bw, by + 1,
+                (hintA << 24) | 0x7040CC);
+        net.minecraft.client.gui.AbstractGui.fill(ms, bx, by + bh - 1, bx + bw, by + bh,
+                (hintA << 24) | 0x7040CC);
+        drawCenteredString(ms, this.font, bindLabel,
+                bx + bw / 2, by + (bh - 8) / 2, (hintA << 24) | 0xC0A8FF);
+
         drawCenteredString(ms, this.font, "ESC to go back",
-                px + panelW / 2, py + panelH - 13, (hintA << 24) | 0xAAAAAA);
+                px + panelW / 2 + 20, py + panelH - 13, (hintA << 24) | 0xAAAAAA);
     }
 
     @Override
@@ -272,6 +286,20 @@ public class SettingsScreen extends Screen {
         for (Slider s : sliders)       if (s.mousePressed(mx, my, button)) return true;
         for (ToggleButton t : toggles) if (t.mousePressed(mx, my, button)) return true;
         for (CycleButton c : cycles)   if (c.mousePressed(mx, my, button)) return true;
+
+        // Bind Key button click
+        if (button == 0) {
+            boolean hasColor = feature.has(FeatureType.Caps.COLOR);
+            int panelW = hasColor ? 340 : 310;
+            int panelH = calcPanelHeight();
+            int px = (this.width - panelW) / 2;
+            int py = (this.height - panelH) / 2;
+            int bx = px + 10, by = py + panelH - 22, bw = 80, bh = 14;
+            if (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh) {
+                Minecraft.getInstance().setScreen(new BindKeyScreen(feature, this));
+                return true;
+            }
+        }
         return super.mouseClicked(mx, my, button);
     }
 
