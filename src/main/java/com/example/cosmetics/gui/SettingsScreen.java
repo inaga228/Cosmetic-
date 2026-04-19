@@ -1,5 +1,6 @@
 package com.example.cosmetics.gui;
 
+import com.example.cosmetics.client.BindManager;
 import com.example.cosmetics.client.CosmeticsState;
 import com.example.cosmetics.feature.FeatureSettings;
 import com.example.cosmetics.feature.FeatureType;
@@ -15,17 +16,13 @@ import net.minecraft.util.text.StringTextComponent;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Settings panel for a single feature.
- * Supports: sliders, toggle (boolean) buttons, cycle buttons (enum choice).
- */
 public class SettingsScreen extends Screen {
 
-    private final FeatureType feature;
+    private final FeatureType    feature;
     private final FeatureSettings fs;
-    private final List<Slider>       sliders  = new ArrayList<>();
-    private final List<ToggleButton> toggles  = new ArrayList<>();
-    private final List<CycleButton>  cycles   = new ArrayList<>();
+    private final List<Slider>       sliders = new ArrayList<>();
+    private final List<ToggleButton> toggles = new ArrayList<>();
+    private final List<CycleButton>  cycles  = new ArrayList<>();
     private ColorPicker colorPicker;
     private long openedAtMs;
 
@@ -40,9 +37,7 @@ public class SettingsScreen extends Screen {
     @Override
     protected void init() {
         openedAtMs = System.currentTimeMillis();
-        sliders.clear();
-        toggles.clear();
-        cycles.clear();
+        sliders.clear(); toggles.clear(); cycles.clear();
         colorPicker = null;
 
         boolean hasColor = feature.has(FeatureType.Caps.COLOR);
@@ -51,55 +46,64 @@ public class SettingsScreen extends Screen {
         int px = (this.width - panelW) / 2;
         int py = (this.height - panelH) / 2;
 
-        int sx = px + 12;
-        int sy = py + 46;
-        int sw = panelW - 24;
-        int rowH = 24;
+        int sx = px + 12, sy = py + 46, sw = panelW - 24, rowH = 24;
         int i = 0;
 
-        if (hasColor) {
-            colorPicker = new ColorPicker(sx, sy, sw, 50, fs);
-            sy += 58;
-        }
+        if (hasColor) { colorPicker = new ColorPicker(sx, sy, sw, 50, fs); sy += 58; }
 
-        // ---- Sliders -----------------------------------------------------------
+        // ══════════════════════════════════════════════════════
+        // SLIDERS — общие для многих фич
+        // ══════════════════════════════════════════════════════
+
         if (feature.has(FeatureType.Caps.SIZE)) {
-            if (feature == FeatureType.SMOOTH_AIM) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "FOV", 1F, 360F,
-                        () -> fs.size, v -> fs.size = v));
-            } else if (feature == FeatureType.KILL_AURA) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Range", 0.5F, 10F,
-                        () -> fs.size, v -> fs.size = v));
-            } else {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Size", 0.25F, 3F,
-                        () -> fs.size, v -> fs.size = v));
-            }
-            i++;
+            String lbl = feature == FeatureType.SMOOTH_AIM ? "FOV"
+                       : feature == FeatureType.KILL_AURA  ? "Range"
+                       : "Size";
+            float mn = feature == FeatureType.SMOOTH_AIM ? 1F
+                     : feature == FeatureType.KILL_AURA  ? 0.5F
+                     : 0.25F;
+            float mx = feature == FeatureType.SMOOTH_AIM ? 360F
+                     : feature == FeatureType.KILL_AURA  ? 10F
+                     : 3F;
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, lbl, mn, mx,
+                    () -> fs.size, v -> fs.size = v));
         }
         if (feature.has(FeatureType.Caps.DENSITY)) {
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Density", 0F, 3F,
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Density", 0F, 3F,
                     () -> fs.density, v -> fs.density = v));
-            i++;
         }
         if (feature.has(FeatureType.Caps.SPEED)) {
-            if (feature == FeatureType.SMOOTH_AIM) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Smoothness", 1F, 20F,
-                        () -> fs.speed, v -> fs.speed = v));
-            } else if (feature == FeatureType.AUTO_CLICKER) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Max CPS", 1F, 20F,
-                        () -> fs.speed, v -> fs.speed = v));
-            } else if (feature == FeatureType.STRAFE) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Speed", 0.5F, 5F,
-                        () -> fs.speed, v -> fs.speed = v));
-            } else {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Speed", 0.25F, 3F,
-                        () -> fs.speed, v -> fs.speed = v));
-            }
-            i++;
+            String lbl = feature == FeatureType.SMOOTH_AIM  ? "Smoothness"
+                       : feature == FeatureType.AUTO_CLICKER ? "Max CPS"
+                       : feature == FeatureType.STRAFE       ? "Speed"
+                       : "Speed";
+            float mn = feature == FeatureType.SMOOTH_AIM  ? 1F
+                     : feature == FeatureType.AUTO_CLICKER ? 1F
+                     : feature == FeatureType.STRAFE       ? 0.5F
+                     : 0.25F;
+            float mx = feature == FeatureType.SMOOTH_AIM  ? 20F
+                     : feature == FeatureType.AUTO_CLICKER ? 20F
+                     : feature == FeatureType.STRAFE       ? 5F
+                     : 3F;
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, lbl, mn, mx,
+                    () -> fs.speed, v -> fs.speed = v));
         }
         if (feature.has(FeatureType.Caps.COUNT)) {
-            if (feature == FeatureType.CUSTOM_PLACE) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Speed", 1F, 10F,
+            if (feature == FeatureType.AUTO_TOTEM) {
+                sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "HP Threshold", 1F, 10F,
+                        () -> (float) fs.count, v -> fs.count = Math.round(v)) {
+                    @Override public String formatValue() { return fs.count + " ♥"; }
+                });
+            } else if (feature == FeatureType.AUTO_POT || feature == FeatureType.AUTO_GAP) {
+                sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "HP Trigger", 1F, 19F,
+                        () -> (float) fs.count, v -> fs.count = Math.round(v)) {
+                    @Override public String formatValue() { return fs.count + " ♥"; }
+                });
+            } else if (feature == FeatureType.AUTO_CLICKER) {
+                sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Min CPS", 1F, 20F,
+                        () -> (float) fs.count, v -> fs.count = Math.round(v)));
+            } else if (feature == FeatureType.CUSTOM_PLACE) {
+                sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Speed", 1F, 10F,
                         () -> (float) fs.count, v -> fs.count = Math.round(v)) {
                     @Override public String formatValue() {
                         if (fs.count >= 10) return "Max";
@@ -109,101 +113,128 @@ public class SettingsScreen extends Screen {
                         return "Slow";
                     }
                 });
-            } else if (feature == FeatureType.AUTO_TOTEM) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "HP Threshold", 1F, 10F,
-                        () -> (float) fs.count, v -> fs.count = Math.round(v)) {
-                    @Override public String formatValue() { return fs.count + " ♥"; }
-                });
-            } else if (feature == FeatureType.AUTO_POT || feature == FeatureType.AUTO_GAP) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "HP Trigger", 1F, 19F,
-                        () -> (float) fs.count, v -> fs.count = Math.round(v)) {
-                    @Override public String formatValue() { return fs.count + " ♥"; }
-                });
-            } else if (feature == FeatureType.AUTO_CLICKER) {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Min CPS", 1F, 20F,
-                        () -> (float) fs.count, v -> fs.count = Math.round(v)));
             } else {
-                sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Count", 1F, 30F,
+                sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Count", 1F, 30F,
                         () -> (float) fs.count, v -> fs.count = Math.round(v)));
             }
-            i++;
         }
         if (feature.has(FeatureType.Caps.STYLE)) {
-            int maxStyle = getStyleLabels().length;
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Style", 0F, maxStyle - 1,
+            String[] labels = getStyleLabels();
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Style", 0F, labels.length - 1,
                     () -> (float) fs.style, v -> fs.style = Math.round(v)) {
                 @Override public String formatValue() {
-                    String[] labels = getStyleLabels();
                     return labels[Math.floorMod(fs.style, labels.length)];
                 }
             });
-            i++;
         }
         if (feature.has(FeatureType.Caps.OFFSET)) {
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Offset X", -2F, 2F,
-                    () -> fs.offsetX, v -> fs.offsetX = v)); i++;
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Offset Y", -2F, 2F,
-                    () -> fs.offsetY, v -> fs.offsetY = v)); i++;
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Offset Z", -2F, 2F,
-                    () -> fs.offsetZ, v -> fs.offsetZ = v)); i++;
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Offset X", -2F, 2F, () -> fs.offsetX, v -> fs.offsetX = v));
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Offset Y", -2F, 2F, () -> fs.offsetY, v -> fs.offsetY = v));
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Offset Z", -2F, 2F, () -> fs.offsetZ, v -> fs.offsetZ = v));
         }
         if (feature.has(FeatureType.Caps.ROTATION)) {
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Rot X", -180F, 180F,
-                    () -> fs.rotX, v -> fs.rotX = v)); i++;
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Rot Y", -180F, 180F,
-                    () -> fs.rotY, v -> fs.rotY = v)); i++;
-            sliders.add(new Slider(sx, sy + i * rowH, sw, 17, "Rot Z", -180F, 180F,
-                    () -> fs.rotZ, v -> fs.rotZ = v)); i++;
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Rot X", -180F, 180F, () -> fs.rotX, v -> fs.rotX = v));
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Rot Y", -180F, 180F, () -> fs.rotY, v -> fs.rotY = v));
+            sliders.add(new Slider(sx, sy + i++ * rowH, sw, 17, "Rot Z", -180F, 180F, () -> fs.rotZ, v -> fs.rotZ = v));
         }
 
-        // ---- Kill Aura toggles & cycles ----------------------------------------
-        if (feature == FeatureType.KILL_AURA) {
-            // Rotation mode cycle
-            cycles.add(new CycleButton(sx, sy + i * rowH, sw, 17, "Rotation Mode",
-                    new String[]{"Body Track", "Full Lock", "Silent"},
-                    () -> fs.killAuraRotMode,
-                    v -> fs.killAuraRotMode = v));
-            i++;
-
-            // Sort mode cycle
-            cycles.add(new CycleButton(sx, sy + i * rowH, sw, 17, "Target Sort",
-                    new String[]{"Closest", "Lowest HP", "Highest HP"},
-                    () -> fs.killAuraSortMode,
-                    v -> fs.killAuraSortMode = v));
-            i++;
-
-            // Auto Crit toggle
-            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Auto Crit",
-                    () -> fs.killAuraAutoCrit,
-                    v -> fs.killAuraAutoCrit = v));
-            i++;
-
-            // Target: Players
-            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Target Players",
-                    () -> fs.killAuraTargetPlayers,
-                    v -> fs.killAuraTargetPlayers = v));
-            i++;
-
-            // Target: Hostile Mobs
-            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Target Hostile",
-                    () -> fs.killAuraTargetHostile,
-                    v -> fs.killAuraTargetHostile = v));
-            i++;
-
-            // Target: Passive
-            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Target Passive",
-                    () -> fs.killAuraTargetPassive,
-                    v -> fs.killAuraTargetPassive = v));
-            i++;
-
-            // Anti Bot filter
-            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Anti Bot Filter",
-                    () -> fs.killAuraAntiBot,
-                    v -> fs.killAuraAntiBot = v));
-            // i++; // last, no need
+        // ══════════════════════════════════════════════════════
+        // BOOL — галочки и выборы, у каждой фичи своё
+        // ══════════════════════════════════════════════════════
+        if (feature.has(FeatureType.Caps.BOOL)) {
+            addBoolWidgets(sx, sy, sw, rowH, i);
         }
     }
 
+    /** Добавляет виджеты-галочки/выборы для конкретной фичи. */
+    private void addBoolWidgets(int sx, int sy, int sw, int rowH, int startI) {
+        int i = startI;
+
+        // ---- Trails ----------------------------------------------------------
+        if (feature == FeatureType.RAINBOW_TRAIL
+         || feature == FeatureType.FLAME_TRAIL
+         || feature == FeatureType.GALAXY_TRAIL) {
+            cycles.add(new CycleButton(sx, sy + i++ * rowH, sw, 17, "Fade Mode",
+                    new String[]{"Solid", "Fade Out", "Rainbow"},
+                    () -> fs.trailFadeMode, v -> fs.trailFadeMode = v));
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Only When Moving",
+                    () -> fs.trailOnlyWhenMoving, v -> fs.trailOnlyWhenMoving = v));
+        }
+
+        // ---- Auras -----------------------------------------------------------
+        else if (feature == FeatureType.AURA
+              || feature == FeatureType.SNOW_AURA
+              || feature == FeatureType.HEART_AURA) {
+            cycles.add(new CycleButton(sx, sy + i++ * rowH, sw, 17, "Shape",
+                    new String[]{"Orbit", "Random", "Pulse"},
+                    () -> fs.auraShape, v -> fs.auraShape = v));
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Rotate",
+                    () -> fs.auraRotate, v -> fs.auraRotate = v));
+        }
+
+        // ---- Wings -----------------------------------------------------------
+        else if (feature == FeatureType.DRAGON_WINGS) {
+            toggles.add(new ToggleButton(sx, sy + i++ * rowH, sw, 17, "Flap Animation",
+                    () -> fs.wingsFlapAnim, v -> fs.wingsFlapAnim = v));
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Only When Sprinting",
+                    () -> fs.wingsOnlySprinting, v -> fs.wingsOnlySprinting = v));
+        }
+
+        // ---- Kill Aura -------------------------------------------------------
+        else if (feature == FeatureType.KILL_AURA) {
+            cycles.add(new CycleButton(sx, sy + i++ * rowH, sw, 17, "Rotation Mode",
+                    new String[]{"Body Track", "Full Lock", "Silent"},
+                    () -> fs.killAuraRotMode, v -> fs.killAuraRotMode = v));
+            cycles.add(new CycleButton(sx, sy + i++ * rowH, sw, 17, "Target Sort",
+                    new String[]{"Closest", "Lowest HP", "Highest HP"},
+                    () -> fs.killAuraSortMode, v -> fs.killAuraSortMode = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * rowH, sw, 17, "Auto Crit",
+                    () -> fs.killAuraAutoCrit, v -> fs.killAuraAutoCrit = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * rowH, sw, 17, "Target Players",
+                    () -> fs.killAuraTargetPlayers, v -> fs.killAuraTargetPlayers = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * rowH, sw, 17, "Target Hostile",
+                    () -> fs.killAuraTargetHostile, v -> fs.killAuraTargetHostile = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * rowH, sw, 17, "Target Passive",
+                    () -> fs.killAuraTargetPassive, v -> fs.killAuraTargetPassive = v));
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Anti Bot Filter",
+                    () -> fs.killAuraAntiBot, v -> fs.killAuraAntiBot = v));
+        }
+
+        // ---- Smooth Aim ------------------------------------------------------
+        else if (feature == FeatureType.SMOOTH_AIM) {
+            toggles.add(new ToggleButton(sx, sy + i++ * rowH, sw, 17, "Only Players",
+                    () -> fs.smoothAimOnlyPlayers, v -> fs.smoothAimOnlyPlayers = v));
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Need Weapon in Hand",
+                    () -> fs.smoothAimNeedWeapon, v -> fs.smoothAimNeedWeapon = v));
+        }
+
+        // ---- Auto Clicker ----------------------------------------------------
+        else if (feature == FeatureType.AUTO_CLICKER) {
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Only Target in Range",
+                    () -> fs.clickerOnlyInRange, v -> fs.clickerOnlyInRange = v));
+        }
+
+        // ---- Strafe ----------------------------------------------------------
+        else if (feature == FeatureType.STRAFE) {
+            cycles.add(new CycleButton(sx, sy + i * rowH, sw, 17, "Direction",
+                    new String[]{"Left", "Right", "Random"},
+                    () -> fs.strafeDirection, v -> fs.strafeDirection = v));
+        }
+
+        // ---- HUDs ------------------------------------------------------------
+        else if (feature == FeatureType.COSMETICS_HUD || feature == FeatureType.TARGET_HUD) {
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Only When Active",
+                    () -> fs.hudOnlyWhenActive, v -> fs.hudOnlyWhenActive = v));
+        }
+
+        // ---- Auto Totem ------------------------------------------------------
+        else if (feature == FeatureType.AUTO_TOTEM) {
+            toggles.add(new ToggleButton(sx, sy + i * rowH, sw, 17, "Show Alert Message",
+                    () -> fs.totemShowAlert, v -> fs.totemShowAlert = v));
+        }
+    }
+
+    // ---- Подсчёт высоты панели -----------------------------------------------
     private int calcPanelHeight() {
         int rows = 0;
         if (feature.has(FeatureType.Caps.SIZE))     rows++;
@@ -213,9 +244,16 @@ public class SettingsScreen extends Screen {
         if (feature.has(FeatureType.Caps.STYLE))    rows++;
         if (feature.has(FeatureType.Caps.OFFSET))   rows += 3;
         if (feature.has(FeatureType.Caps.ROTATION)) rows += 3;
-        if (feature == FeatureType.KILL_AURA)       rows += 7; // cycles + toggles
+        if (feature.has(FeatureType.Caps.BOOL))     rows += boolRowCount();
         int colorH = feature.has(FeatureType.Caps.COLOR) ? 58 : 0;
         return 50 + colorH + rows * 24 + 20;
+    }
+
+    private int boolRowCount() {
+        if (feature == FeatureType.KILL_AURA)   return 7;
+        if (feature == FeatureType.DRAGON_WINGS
+         || feature == FeatureType.SMOOTH_AIM)  return 2;
+        return 2; // default: 1 cycle + 1 toggle or 2 toggles
     }
 
     private String[] getStyleLabels() {
@@ -232,6 +270,9 @@ public class SettingsScreen extends Screen {
         return new String[]{"Style 0", "Style 1", "Style 2"};
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // RENDER
+    // ══════════════════════════════════════════════════════════════════════════
     @Override
     public void render(MatrixStack ms, int mouseX, int mouseY, float partialTicks) {
         float anim = animProgress();
@@ -245,16 +286,13 @@ public class SettingsScreen extends Screen {
 
         GuiDraw.roundedPanel(ms, px, py, panelW, panelH, anim);
 
-        // Title bar
-        int titleA = Math.max(0, Math.min(255, (int)(anim * 255)));
+        int a = Math.max(0, Math.min(255, (int)(anim * 255)));
         fillGradient(ms, px + 2, py + 2, px + panelW - 2, py + 36,
-                (titleA << 24) | 0x1A1430, (titleA << 24) | 0x120E22);
-
-        int titleCol = (titleA << 24) | 0xFFFFFF;
+                (a << 24) | 0x1A1430, (a << 24) | 0x120E22);
         drawCenteredString(ms, this.font, feature.displayName + " Settings",
-                px + panelW / 2, py + 14, titleCol);
-        int divCol = (Math.max(0, Math.min(255, (int)(anim * 180))) << 24) | 0x8A5CFF;
-        fill(ms, px + panelW / 2 - 70, py + 28, px + panelW / 2 + 70, py + 30, divCol);
+                px + panelW / 2, py + 14, (a << 24) | 0xFFFFFF);
+        int div = (Math.max(0, Math.min(255, (int)(anim * 180))) << 24) | 0x8A5CFF;
+        fill(ms, px + panelW / 2 - 70, py + 28, px + panelW / 2 + 70, py + 30, div);
 
         if (colorPicker != null) colorPicker.draw(ms, mouseX, mouseY, anim);
         for (Slider s : sliders)       s.draw(ms, anim);
@@ -263,10 +301,10 @@ public class SettingsScreen extends Screen {
 
         int hintA = Math.max(0, Math.min(255, (int)(anim * 140)));
 
-        // Bind Key button (bottom-left of panel)
+        // Кнопка бинда
         int bx = px + 10, by = py + panelH - 22, bw = 80, bh = 14;
-        int bindKey = com.example.cosmetics.client.BindManager.get().getBind(feature);
-        String bindLabel = "Bind: " + com.example.cosmetics.client.BindManager.keyName(bindKey);
+        int bindKey = BindManager.get().getBind(feature);
+        String bindLabel = "Bind: " + BindManager.keyName(bindKey);
         net.minecraft.client.gui.AbstractGui.fill(ms, bx, by, bx + bw, by + bh,
                 (hintA << 24) | 0x2A1E5A);
         net.minecraft.client.gui.AbstractGui.fill(ms, bx, by, bx + bw, by + 1,
@@ -287,7 +325,7 @@ public class SettingsScreen extends Screen {
         for (ToggleButton t : toggles) if (t.mousePressed(mx, my, button)) return true;
         for (CycleButton c : cycles)   if (c.mousePressed(mx, my, button)) return true;
 
-        // Bind Key button click
+        // Клик по кнопке бинда
         if (button == 0) {
             boolean hasColor = feature.has(FeatureType.Caps.COLOR);
             int panelW = hasColor ? 340 : 310;

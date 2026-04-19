@@ -13,6 +13,9 @@ import net.minecraft.entity.passive.AnimalEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.item.SwordItem;
+import net.minecraft.item.AxeItem;
+import net.minecraft.item.TridentItem;
 import net.minecraft.network.play.client.CHeldItemChangePacket;
 import net.minecraft.potion.EffectInstance;
 import net.minecraft.potion.Effects;
@@ -26,15 +29,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
-/**
- * Combat utility features.
- *
- * Kill Aura logic:
- *  - Always uses weapon cooldown gating (attacks only when charge = 1.0)
- *  - Rotation mode: 0 = BODY_TRACK, 1 = FULL_LOCK, 2 = SILENT
- *  - Aim is INSTANT (no lerp) — snaps to target immediately
- *  - All target filters and sort mode exposed as booleans / cycle settings
- */
 public final class CombatHandler {
 
     private static final CombatHandler INSTANCE = new CombatHandler();
@@ -43,13 +37,19 @@ public final class CombatHandler {
     private static final Random RNG = new Random();
 
     // ---- Kill Aura state ----------------------------------------------------
-    private int critJumpedTick = -999;
+    // Собственный таймер атак — не зависит от клиентского getAttackStrengthScale
+    private int  auraAttackCooldown = 0; // тики до следующей атаки
+    private boolean critJumpPending = false; // прыжок для крита выполнен, ждём удара
+    private int  critJumpTick       = -999;
 
-    // ---- Auto Clicker state -------------------------------------------------
+    // ---- Auto Clicker -------------------------------------------------------
     private int clickerTick     = 0;
     private int clickerInterval = 4;
 
-    // ---- Auto Pot / Auto Gap state ------------------------------------------
+    // ---- Strafe -------------------------------------------------------------
+    private double strafeAngle = 0;
+
+    // ---- Auto Pot / Auto Gap ------------------------------------------------
     private int potCooldown = 0;
     private int gapCooldown = 0;
 
@@ -87,102 +87,133 @@ public final class CombatHandler {
     // =========================================================================
     // KILL AURA
     //
-    // Attack fires ONLY when weapon is fully charged (cooldown = 1.0).
-    // No manual delay setting — the weapon's own cooldown IS the delay.
-    // Aim is INSTANT — no smoothing.
+    // Логика cooldown:
+    //   - Получаем скорость атаки оружия (attackSpeed атрибут)
+    //   - Рассчитываем количество тиков для полного заряда (20 / attackSpeed)
+    //   - После каждого удара ставим свой таймер auraAttackCooldown
+    //   - Бьём только когда таймер = 0 И getAttackStrengthScale >= 1.0
+    //   - Так удары гарантированно идут и не застревают
     // =========================================================================
     private void tickKillAura(Minecraft mc, ClientPlayerEntity player) {
-        if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) return;
+        if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
+            auraAttackCooldown = 0;
+            critJumpPending    = false;
+            return;
+        }
 
         FeatureSettings fs = CosmeticsState.get().settings(FeatureType.KILL_AURA);
-
         float range = Math.max(0.5F, Math.min(10F, fs.size));
 
-        // ---- Find target ----------------------------------------------------
+        // Тик нашего таймера
+        if (auraAttackCooldown > 0) {
+            auraAttackCooldown--;
+            return;
+        }
+
+        // ---- Поиск цели -------------------------------------------------------
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(range),
                 e -> isValidKillAuraTarget(e, player, fs));
 
-        if (candidates.isEmpty()) return;
+        if (candidates.isEmpty()) {
+            critJumpPending = false;
+            return;
+        }
 
         LivingEntity target = pickTarget(candidates, player, fs.killAuraSortMode);
         if (target == null) return;
 
-        // ---- Instant aim (no lerp / smoothing) ------------------------------
-        double dx = target.getX() - player.getX();
-        double dy = (target.getY() + target.getBbHeight() * 0.5)
-                  - (player.getY() + player.getEyeHeight());
-        double dz = target.getZ() - player.getZ();
+        // ---- Мгновенное наведение -------------------------------------------
+        double dx   = target.getX() - player.getX();
+        double dy   = (target.getY() + target.getBbHeight() * 0.5)
+                    - (player.getY() + player.getEyeHeight());
+        double dz   = target.getZ() - player.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
 
         float wantYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float wantPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
-        wantPitch = Math.max(-90F, Math.min(90F, wantPitch));
+        float wantPitch = Math.max(-90F, Math.min(90F,
+                          (float)(-Math.toDegrees(Math.atan2(dy, dist)))));
 
-        int rotMode = Math.floorMod(fs.killAuraRotMode, 3);
-        switch (rotMode) {
-            case 0: // BODY_TRACK — snap body, keep camera free
+        switch (Math.floorMod(fs.killAuraRotMode, 3)) {
+            case 0: // BODY_TRACK
                 player.yBodyRot = wantYaw;
                 player.yHeadRot = wantYaw;
                 break;
-            case 1: // FULL_LOCK — snap camera too
+            case 1: // FULL_LOCK
                 player.yRot     = wantYaw;
                 player.xRot     = wantPitch;
                 player.yBodyRot = wantYaw;
                 player.yHeadRot = wantYaw;
                 break;
-            case 2: // SILENT — no rotation at all
-                break;
+            // case 2: SILENT — ничего не трогаем
         }
 
-        // ---- Weapon cooldown gate (always ON) --------------------------------
-        if (player.getAttackStrengthScale(0F) < 1.0F) return;
+        // ---- Ждём полного заряда оружия -------------------------------------
+        // getAttackStrengthScale(0F) = 1.0 когда оружие полностью заряжено
+        float charge = player.getAttackStrengthScale(0F);
+        if (charge < 1.0F) return;
 
-        // ---- Auto Crit: micro-jump before swing ------------------------------
+        // ---- Auto Crit -------------------------------------------------------
         if (fs.killAuraAutoCrit) {
-            boolean canCrit = player.isOnGround()
-                    && !player.isCrouching()
-                    && !player.isInWater()
-                    && !player.onClimbable()
-                    && !player.isSprinting();
-            if (canCrit) {
-                int tick = (int)(mc.level.getGameTime() & 0x7FFFFFFF);
-                if (tick != critJumpedTick) {
-                    player.setDeltaMovement(
-                            player.getDeltaMovement().x,
-                            0.11,
-                            player.getDeltaMovement().z);
-                    critJumpedTick = tick;
-                    return; // attack next tick after the jump
+            // Фаза 1: делаем прыжок
+            if (!critJumpPending) {
+                boolean canCrit = player.isOnGround()
+                        && !player.isCrouching()
+                        && !player.isInWater()
+                        && !player.onClimbable()
+                        && !player.isSprinting();
+                if (canCrit) {
+                    int tick = (int)(mc.level.getGameTime() & 0x7FFFFFFF);
+                    if (tick != critJumpTick) {
+                        // Микро-прыжок
+                        player.setDeltaMovement(
+                                player.getDeltaMovement().x,
+                                0.11,
+                                player.getDeltaMovement().z);
+                        critJumpTick    = tick;
+                        critJumpPending = true;
+                        // Ждём 1 тик чтобы встать в воздух, потом ударим
+                        auraAttackCooldown = 1;
+                        return;
+                    }
                 }
             }
+            // Фаза 2: мы уже прыгнули — бьём
+            critJumpPending = false;
         }
 
-        // ---- Attack! ---------------------------------------------------------
+        // ---- Атака -----------------------------------------------------------
         mc.gameMode.attack(player, target);
         player.swing(Hand.MAIN_HAND);
+
+        // Рассчитываем тики cooldown оружия
+        // attackSpeed атрибут: меч = 1.6, топор = 0.9, кулак = 4.0
+        // Тиков до полного заряда = 20 / attackSpeed
+        double atkSpeed = player.getAttributeValue(
+                net.minecraft.entity.ai.attributes.Attributes.ATTACK_SPEED);
+        // Минимум 1 тик, добавляем 1 тик запаса чтобы не бить раньше времени
+        int cooldownTicks = Math.max(1, (int) Math.ceil(20.0 / atkSpeed));
+        auraAttackCooldown = cooldownTicks;
     }
 
-    // ---- Target filter -------------------------------------------------------
+    // ---- Фильтр целей --------------------------------------------------------
     private static boolean isValidKillAuraTarget(LivingEntity e,
                                                   ClientPlayerEntity player,
                                                   FeatureSettings fs) {
         if (e == player)  return false;
         if (!e.isAlive()) return false;
 
-        // Category filters
         boolean isPlayer  = e instanceof PlayerEntity;
         boolean isHostile = e instanceof IMob;
-        boolean isPassive = e instanceof AnimalEntity && !isHostile;
+        boolean isPassive = (e instanceof AnimalEntity) && !isHostile;
 
-        if (isPlayer  && !fs.killAuraTargetPlayers)  return false;
-        if (isHostile && !fs.killAuraTargetHostile)  return false;
-        if (isPassive && !fs.killAuraTargetPassive)  return false;
-        // If none of the three categories matched, skip
-        if (!isPlayer && !isHostile && !isPassive)   return false;
+        if (isPlayer  && !fs.killAuraTargetPlayers) return false;
+        if (isHostile && !fs.killAuraTargetHostile) return false;
+        if (isPassive && !fs.killAuraTargetPassive) return false;
+        if (!isPlayer && !isHostile && !isPassive)  return false;
 
-        // Anti Bot filter
+        // Anti Bot
         if (fs.killAuraAntiBot && isPlayer) {
             if (e.isInvisible()) return false;
             if (e.getName().getString().isEmpty()) return false;
@@ -191,7 +222,7 @@ public final class CombatHandler {
         return true;
     }
 
-    // ---- Target picker -------------------------------------------------------
+    // ---- Выбор цели ----------------------------------------------------------
     private static LivingEntity pickTarget(List<LivingEntity> list,
                                            ClientPlayerEntity player, int sortMode) {
         switch (Math.floorMod(sortMode, 3)) {
@@ -208,7 +239,7 @@ public final class CombatHandler {
     }
 
     // =========================================================================
-    // STANDALONE CRIT (when Kill Aura is off)
+    // STANDALONE CRIT
     // =========================================================================
     private void tickStandaloneCrit(ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.CRIT)) return;
@@ -239,7 +270,7 @@ public final class CombatHandler {
     }
 
     // =========================================================================
-    // SMOOTH AIM — плавная наводка мышкой (отдельная от Kill Aura)
+    // SMOOTH AIM
     // =========================================================================
     private void tickSmoothAim(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.SMOOTH_AIM)) return;
@@ -253,39 +284,34 @@ public final class CombatHandler {
         double bestDist = Double.MAX_VALUE;
         for (Entity e : mc.level.entitiesForRendering()) {
             if (!(e instanceof PlayerEntity) || e == player || !e.isAlive()) continue;
-            double dx = e.getX() - player.getX();
-            double dy = (e.getY() + e.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
-            double dz = e.getZ() - player.getZ();
+            double dx   = e.getX() - player.getX();
+            double dy   = (e.getY() + e.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
+            double dz   = e.getZ() - player.getZ();
             double dist = Math.sqrt(dx * dx + dz * dz);
 
             float needYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
             float needPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
-            float dYaw   = Math.abs(wrapDegrees(needYaw - player.yRot));
-            float dPitch = Math.abs(needPitch - player.xRot);
-            if (dYaw > fov / 2F || dPitch > fov / 2F) continue;
+            if (Math.abs(wrapDeg(needYaw - player.yRot)) > fov / 2F) continue;
+            if (Math.abs(needPitch - player.xRot)        > fov / 2F) continue;
             if (dist < bestDist) { bestDist = dist; target = (PlayerEntity) e; }
         }
         if (target == null) return;
 
-        double dx = target.getX() - player.getX();
-        double dy = (target.getY() + target.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
-        double dz = target.getZ() - player.getZ();
+        double dx   = target.getX() - player.getX();
+        double dy   = (target.getY() + target.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
+        double dz   = target.getZ() - player.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
 
         float tYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
         float tPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
-
-        float lerpT = speed / 20F;
-        player.yRot = lerpAngle(player.yRot, tYaw, lerpT);
-        player.xRot = lerp(player.xRot, tPitch, lerpT);
-        player.xRot = Math.max(-90F, Math.min(90F, player.xRot));
+        float t = speed / 20F;
+        player.yRot = lerpAngle(player.yRot, tYaw, t);
+        player.xRot = Math.max(-90F, Math.min(90F, lerp(player.xRot, tPitch, t)));
     }
 
     // =========================================================================
     // STRAFE
     // =========================================================================
-    private double strafeAngle = 0;
-
     private void tickStrafe(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.STRAFE)) return;
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) return;
@@ -311,13 +337,10 @@ public final class CombatHandler {
         double radius = Math.max(2.0, range * 0.6);
         double tx = target.getX() + Math.cos(strafeAngle) * radius;
         double tz = target.getZ() + Math.sin(strafeAngle) * radius;
-
-        double moveX = tx - player.getX();
-        double moveZ = tz - player.getZ();
-        double len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+        double mx = tx - player.getX(), mz = tz - player.getZ();
+        double len = Math.sqrt(mx * mx + mz * mz);
         if (len > 0.01) {
-            moveX /= len; moveZ /= len;
-            player.setDeltaMovement(moveX * 0.28, player.getDeltaMovement().y, moveZ * 0.28);
+            player.setDeltaMovement(mx / len * 0.28, player.getDeltaMovement().y, mz / len * 0.28);
         }
     }
 
@@ -328,9 +351,8 @@ public final class CombatHandler {
         if (!CosmeticsState.get().isOn(FeatureType.AUTO_POT)) return;
         if (potCooldown > 0) return;
         FeatureSettings fs = CosmeticsState.get().settings(FeatureType.AUTO_POT);
-        float threshold = fs.count * 2F;
         if (player.getHealth() >= player.getMaxHealth() - 0.5F) return;
-        if (player.getHealth() > threshold) return;
+        if (player.getHealth() > fs.count * 2F) return;
 
         NonNullList<ItemStack> inv = player.inventory.items;
         int potSlot = -1;
@@ -346,17 +368,17 @@ public final class CombatHandler {
         }
         if (potSlot == -1) return;
 
-        int prev       = player.inventory.selected;
-        int hotbarSlot = potSlot < 9 ? potSlot : 0;
+        int prev = player.inventory.selected;
+        int slot = potSlot < 9 ? potSlot : 0;
         if (potSlot >= 9) {
-            ItemStack tmp = inv.get(hotbarSlot).copy();
-            inv.set(hotbarSlot, inv.get(potSlot).copy());
+            ItemStack tmp = inv.get(slot).copy();
+            inv.set(slot, inv.get(potSlot).copy());
             inv.set(potSlot, tmp.isEmpty() ? ItemStack.EMPTY : tmp);
         }
         float origPitch = player.xRot;
         player.xRot = 90F;
-        player.inventory.selected = hotbarSlot;
-        mc.getConnection().send(new CHeldItemChangePacket(hotbarSlot));
+        player.inventory.selected = slot;
+        mc.getConnection().send(new CHeldItemChangePacket(slot));
         mc.gameMode.useItem(player, mc.level, Hand.MAIN_HAND);
         player.xRot = origPitch;
         player.inventory.selected = prev;
@@ -371,45 +393,40 @@ public final class CombatHandler {
         if (!CosmeticsState.get().isOn(FeatureType.AUTO_GAP)) return;
         if (gapCooldown > 0) return;
         FeatureSettings fs = CosmeticsState.get().settings(FeatureType.AUTO_GAP);
-        float threshold = fs.count * 2F;
-        if (player.getHealth() > threshold) return;
+        if (player.getHealth() > fs.count * 2F) return;
 
         NonNullList<ItemStack> inv = player.inventory.items;
-        int gapSlot = -1;
+        int slot = -1;
         for (int i = 0; i < inv.size(); i++) {
             if (inv.get(i).getItem() == Items.GOLDEN_APPLE
-             || inv.get(i).getItem() == Items.ENCHANTED_GOLDEN_APPLE) {
-                gapSlot = i; break;
-            }
+             || inv.get(i).getItem() == Items.ENCHANTED_GOLDEN_APPLE) { slot = i; break; }
         }
-        if (gapSlot == -1) return;
+        if (slot == -1) return;
 
-        int prev       = player.inventory.selected;
-        int hotbarSlot = gapSlot < 9 ? gapSlot : 0;
-        if (gapSlot >= 9) {
-            ItemStack tmp = inv.get(hotbarSlot).copy();
-            inv.set(hotbarSlot, inv.get(gapSlot).copy());
-            inv.set(gapSlot, tmp.isEmpty() ? ItemStack.EMPTY : tmp);
+        int prev = player.inventory.selected;
+        int hSlot = slot < 9 ? slot : 0;
+        if (slot >= 9) {
+            ItemStack tmp = inv.get(hSlot).copy();
+            inv.set(hSlot, inv.get(slot).copy());
+            inv.set(slot, tmp.isEmpty() ? ItemStack.EMPTY : tmp);
         }
-        player.inventory.selected = hotbarSlot;
-        mc.getConnection().send(new CHeldItemChangePacket(hotbarSlot));
+        player.inventory.selected = hSlot;
+        mc.getConnection().send(new CHeldItemChangePacket(hSlot));
         mc.gameMode.useItem(player, mc.level, Hand.MAIN_HAND);
         player.inventory.selected = prev;
         mc.getConnection().send(new CHeldItemChangePacket(prev));
         gapCooldown = 40;
     }
 
-    // ---- helpers ---------------------------------------------------------------
+    // ---- helpers -------------------------------------------------------------
     private static float lerpAngle(float from, float to, float t) {
-        return from + wrapDegrees(to - from) * t;
+        return from + wrapDeg(to - from) * t;
     }
-
     private static float lerp(float a, float b, float t) { return a + (b - a) * t; }
-
-    private static float wrapDegrees(float d) {
+    private static float wrapDeg(float d) {
         d %= 360F;
-        if (d >= 180F)  d -= 360F;
-        if (d < -180F)  d += 360F;
+        if (d >= 180F) d -= 360F;
+        if (d < -180F) d += 360F;
         return d;
     }
 

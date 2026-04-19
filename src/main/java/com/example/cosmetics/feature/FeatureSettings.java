@@ -2,7 +2,6 @@ package com.example.cosmetics.feature;
 
 /**
  * Mutable settings bag for a feature.
- * Not every field is used by every feature; see {@link FeatureType#caps}.
  */
 public final class FeatureSettings {
     public float colorR = 1.0F;
@@ -19,31 +18,46 @@ public final class FeatureSettings {
     public float offsetX = 0.0F, offsetY = 0.0F, offsetZ = 0.0F;
     public float rotX    = 0.0F, rotY    = 0.0F, rotZ    = 0.0F;
 
-    // ---- Kill Aura boolean toggles -------------------------------------------
-    // Weapon cooldown gate: attack ONLY when the weapon is fully charged (always ON now)
-    // autoCrit: micro-jump before each swing for guaranteed crit
-    public boolean killAuraAutoCrit   = false;
-    // Target filters
-    public boolean killAuraTargetPlayers  = false;
-    public boolean killAuraTargetHostile  = true;
-    public boolean killAuraTargetPassive  = false;
-    // Anti-bot filter
-    public boolean killAuraAntiBot        = false;
-    // Rotation mode (stored as int for CycleButton)
-    // 0 = BODY_TRACK, 1 = FULL_LOCK, 2 = SILENT
-    public int killAuraRotMode = 0;
-    // Sort mode
-    // 0 = closest, 1 = lowest HP, 2 = highest HP
-    public int killAuraSortMode = 0;
-    // -------------------------------------------------------------------------
+    // ---- Kill Aura ----------------------------------------------------------
+    public boolean killAuraAutoCrit      = false;
+    public boolean killAuraTargetPlayers = false;
+    public boolean killAuraTargetHostile = true;
+    public boolean killAuraTargetPassive = false;
+    public boolean killAuraAntiBot       = false;
+    public int     killAuraRotMode       = 0; // 0=BodyTrack 1=FullLock 2=Silent
+    public int     killAuraSortMode      = 0; // 0=Closest 1=LowestHP 2=HighestHP
+
+    // ---- Trails -------------------------------------------------------------
+    public boolean trailOnlyWhenMoving = false;
+    public int     trailFadeMode       = 0; // 0=Solid 1=Fade 2=Rainbow
+
+    // ---- Auras (Particles) --------------------------------------------------
+    public boolean auraRotate          = true;
+    public int     auraShape           = 0;  // 0=Orbit 1=Random 2=Pulse
+
+    // ---- Wings --------------------------------------------------------------
+    public boolean wingsOnlySprinting  = false;
+    public boolean wingsFlapAnim       = true;
 
     // ---- Smooth Aim ---------------------------------------------------------
-    // No toggles needed here, kept for FOV (size) only.
-    // -------------------------------------------------------------------------
+    public boolean smoothAimOnlyPlayers     = true;
+    public boolean smoothAimNeedWeapon      = false;
 
-    // ---- Legacy extraFlags (kept for compat, but KA now uses booleans above) --
-    public int style2      = 0;
-    public int extraFlags  = 0x0A;
+    // ---- Auto Clicker -------------------------------------------------------
+    public boolean clickerOnlyInRange       = false;
+
+    // ---- Strafe -------------------------------------------------------------
+    public int     strafeDirection          = 0; // 0=Left 1=Right 2=Random
+
+    // ---- HUD ----------------------------------------------------------------
+    public boolean hudOnlyWhenActive        = false;
+
+    // ---- Auto Totem ---------------------------------------------------------
+    public boolean totemShowAlert           = true;
+
+    // ---- Legacy (kept for compat) -------------------------------------------
+    public int style2     = 0;
+    public int extraFlags = 0x0A;
     // -------------------------------------------------------------------------
 
     public int argb() {
