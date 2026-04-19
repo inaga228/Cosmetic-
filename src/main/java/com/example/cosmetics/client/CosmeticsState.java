@@ -60,7 +60,13 @@ public final class CosmeticsState {
 
             // Combat
             case HIT_EFFECT:    s.colorR = 1.00F; s.colorG = 0.20F; s.colorB = 0.20F; s.count = 8; break;
-            case KILL_AURA:     s.speed = 10F; s.style = 0; break;   // 10 ticks between attacks, mobs only
+            case KILL_AURA:
+                s.speed      = 10F;   // 10 ticks between attacks by default
+                s.size       = 4.5F;  // range in blocks
+                s.style      = 0;     // camera: BODY_TRACK
+                s.style2     = 0;
+                s.extraFlags = 0x0A;  // weapon CD + hostile mobs
+                break;
             case AUTO_CLICKER:  s.count = 8; s.speed = 12F; break;   // 8–12 CPS
 
             // HUDs — default to style 0 (classic neon-purple)

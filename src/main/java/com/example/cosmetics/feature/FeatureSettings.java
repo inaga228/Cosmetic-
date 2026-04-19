@@ -9,20 +9,37 @@ public final class FeatureSettings {
     public float colorG = 1.0F;
     public float colorB = 1.0F;
 
-    public float size = 1.0F;      // 0.25 .. 3.0
-    public float density = 1.0F;   // 0.0 .. 3.0 (particles per tick multiplier)
-    public float speed = 1.0F;     // 0.25 .. 3.0
+    public float size    = 1.0F;
+    public float density = 1.0F;
+    public float speed   = 1.0F;
 
     public int style = 0;
-    public int count = 8;          // count of particles per event (hit effects)
+    public int count = 8;
 
-    public float offsetX = 0.0F, offsetY = 0.0F, offsetZ = 0.0F; // -1 .. 1
-    public float rotX = 0.0F,    rotY = 0.0F,    rotZ = 0.0F;    // -180 .. 180
+    public float offsetX = 0.0F, offsetY = 0.0F, offsetZ = 0.0F;
+    public float rotX    = 0.0F, rotY    = 0.0F, rotZ    = 0.0F;
+
+    // ---- Kill Aura extended ---------------------------------------------------
+    // style2 — camera/rotation mode:
+    //   0 = BODY_TRACK  body yaw snaps to target, but 1st-person view stays free
+    //                   (3rd-person shows player visibly turned toward enemy)
+    //   1 = FULL_LOCK   yaw + pitch lock to target in all perspectives
+    //   2 = SILENT      no rotation at all — purely server-side swing
+    //
+    // extraFlags bitmask:
+    //   bit 0 (0x01) = weapon cooldown gating  (only attack when fully charged)
+    //   bit 1 (0x02) = auto crit               (micro-jump before each hit)
+    //   bit 2 (0x04) = target players
+    //   bit 3 (0x08) = target hostile mobs
+    //   bit 4 (0x10) = target passive / neutral animals
+    public int style2      = 0;
+    public int extraFlags  = 0x0A; // default: weapon CD + hostile mobs
+    // -------------------------------------------------------------------------
 
     public int argb() {
-        int r = clamp255((int) (colorR * 255));
-        int g = clamp255((int) (colorG * 255));
-        int b = clamp255((int) (colorB * 255));
+        int r = clamp255((int)(colorR * 255));
+        int g = clamp255((int)(colorG * 255));
+        int b = clamp255((int)(colorB * 255));
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 

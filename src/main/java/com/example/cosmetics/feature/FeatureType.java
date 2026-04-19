@@ -51,8 +51,8 @@ public enum FeatureType {
     AUTO_BLOCK      ("Auto Block",       Category.COMBAT, 0),
     NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0),
 
-    // Kill Aura: SPEED = attack delay ticks, STYLE = target filter (0=mobs, 1=players, 2=all)
-    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SPEED | Caps.STYLE),
+    // Kill Aura: SPEED = attack delay ticks, SIZE = range, STYLE = camera mode, COUNT = sort mode
+    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SPEED | Caps.SIZE | Caps.STYLE | Caps.COUNT),
     // Crit: forces crits by micro-jumping before each swing
     CRIT         ("Crit",         Category.COMBAT, 0),
     // Auto Clicker: COUNT = min CPS, SPEED = max CPS

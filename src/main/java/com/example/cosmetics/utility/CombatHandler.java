@@ -6,24 +6,48 @@ import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.EntityClassification;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ShieldItem;
 import net.minecraft.util.Hand;
-import net.minecraft.util.math.vector.Vector3d;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
 /**
- * Handles combat utility features:
- *  - Auto Block     (shield up when enemy nearby)
- *  - No Fire Overlay
- *  - Kill Aura      (auto-attack nearest entity)
- *  - Crit           (micro-jump before swing to force critical hit)
- *  - Auto Clicker   (simulate LMB clicks at configurable CPS)
+ * Combat utility features:
+ *
+ *  Kill Aura
+ *  ─────────
+ *  size        — attack range in blocks (0.5 – 10)
+ *  speed       — minimum ticks between attacks (1 – 40)
+ *                when "weapon cooldown" flag is on this becomes a lower bound;
+ *                the actual attack only fires once the weapon is fully charged.
+ *  style       — camera/rotation mode
+ *                  0  BODY_TRACK  body yaw snaps to target;
+ *                                 1st-person view stays free (look around freely),
+ *                                 3rd-person shows the character visibly turned
+ *                  1  FULL_LOCK   yaw + pitch snap in all perspectives
+ *                  2  SILENT      no rotation at all (ghost hits)
+ *  extraFlags  — bitmask of toggles
+ *                  0x01  weapon cooldown gate (attack only when fully charged)
+ *                  0x02  auto crit            (micro-jump before each swing)
+ *                  0x04  target players
+ *                  0x08  target hostile mobs
+ *                  0x10  target passive / neutral animals
+ *
+ *  count       — target sort mode
+ *                  0  closest first
+ *                  1  lowest HP first
+ *                  2  highest HP first
+ *
+ *  Auto Clicker
+ *  ────────────
+ *  count  — min CPS, speed — max CPS (1-20)
  */
 public final class CombatHandler {
 
@@ -32,24 +56,27 @@ public final class CombatHandler {
 
     private static final Random RNG = new Random();
 
-    // Auto Block
+    // ---- Kill Aura state -------------------------------------------------------
+    private int    auraCooldown   = 0;
+    private float  savedYaw       = 0;   // player's own view yaw when BODY_TRACK
+    private float  savedPitch     = 0;
+    private boolean auraWasActive = false;
+
+    // ---- Crit state ------------------------------------------------------------
+    private int critJumpedTick = -999; // game tick when micro-jump was issued
+
+    // ---- Auto Block state ------------------------------------------------------
     private int blockCooldown = 0;
     private static final int BLOCK_LOWER_TICKS = 6;
-    private static final double BLOCK_RANGE = 6.0;
+    private static final double BLOCK_RANGE    = 6.0;
 
-    // Kill Aura
-    private int killAuraCooldown = 0;
-
-    // Crit
-    private boolean critPending = false;
-
-    // Auto Clicker
-    private int clickerTick = 0;
-    private int clickerInterval = 4; // ticks between clicks, recalculated each cycle
+    // ---- Auto Clicker state ----------------------------------------------------
+    private int clickerTick     = 0;
+    private int clickerInterval = 4;
 
     private CombatHandler() {}
 
-    // -------------------------------------------------------------------------
+    // ============================================================
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
@@ -58,195 +85,246 @@ public final class CombatHandler {
         tickAutoBlock(mc, player);
         tickNoFireOverlay(player);
         tickKillAura(mc, player);
-        tickCrit(mc, player);
         tickAutoClicker(mc, player);
+        // standalone Crit (without Kill Aura) handled inside tickKillAura
+        // and also standalone below
+        if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
+            tickStandaloneCrit(player);
+        }
     }
 
-    // -------------------------------------------------------------------------
-    // No Fire Overlay
-    // -------------------------------------------------------------------------
+    // ============================================================
+    // NO FIRE OVERLAY
+    // ============================================================
     private static void tickNoFireOverlay(ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) return;
-        if (player.getRemainingFireTicks() > 0) {
-            player.setRemainingFireTicks(0);
-        }
+        if (player.getRemainingFireTicks() > 0) player.setRemainingFireTicks(0);
     }
 
-    // -------------------------------------------------------------------------
-    // Kill Aura
-    //
-    // style 0 = mobs only, style 1 = players only, style 2 = all living entities
-    // speed = attack cooldown in ticks (min 1)
-    // -------------------------------------------------------------------------
+    // ============================================================
+    // KILL AURA  (full rewrite)
+    // ============================================================
     private void tickKillAura(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
-            killAuraCooldown = 0;
+            // Restore view if we were rotating it
+            if (auraWasActive) {
+                player.yRot  = savedYaw;
+                player.xRot  = savedPitch;
+                auraWasActive = false;
+            }
+            auraCooldown = 0;
             return;
         }
 
-        if (killAuraCooldown > 0) {
-            killAuraCooldown--;
-            return;
+        FeatureSettings fs  = CosmeticsState.get().settings(FeatureType.KILL_AURA);
+        int   camMode       = Math.floorMod(fs.style, 3);
+        int   flags         = fs.extraFlags;
+        int   sortMode      = Math.floorMod(fs.count, 3);
+        float range         = Math.max(0.5F, Math.min(10F, fs.size));
+        int   minDelay      = Math.max(1, (int) fs.speed);
+        boolean useWeaponCD = (flags & 0x01) != 0;
+        boolean autoCrit    = (flags & 0x02) != 0;
+
+        // Save the player's own mouse-look so we can restore it in BODY_TRACK
+        if (!auraWasActive) {
+            savedYaw   = player.yRot;
+            savedPitch = player.xRot;
         }
+        auraWasActive = true;
 
-        FeatureSettings fs = CosmeticsState.get().settings(FeatureType.KILL_AURA);
-        int style = Math.floorMod(fs.style, 3);
-        double range = 4.5; // standard melee range
-
-        List<LivingEntity> targets = mc.level.getEntitiesOfClass(
+        // ---- Find target -------------------------------------------------------
+        List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(range),
-                e -> isValidTarget(e, player, style));
+                e -> isValidTarget(e, player, flags));
 
-        if (targets.isEmpty()) return;
+        if (candidates.isEmpty()) {
+            // Restore rotation when no targets
+            if (camMode == 0) {
+                player.yRot = savedYaw;
+                player.xRot = savedPitch;
+            }
+            auraCooldown = 0;
+            return;
+        }
 
-        // Attack closest
-        LivingEntity target = targets.stream()
-                .min(Comparator.comparingDouble(e -> e.distanceToSqr(player)))
-                .orElse(null);
+        LivingEntity target = pickTarget(candidates, player, sortMode);
         if (target == null) return;
 
-        // Face target (snap yaw/pitch smoothly)
-        faceEntity(player, target);
+        // ---- Rotation ----------------------------------------------------------
+        applyRotation(player, target, camMode);
 
-        // Attack
+        // ---- Cooldown ----------------------------------------------------------
+        if (auraCooldown > 0) {
+            auraCooldown--;
+            return;
+        }
+
+        // ---- Weapon charge gate ------------------------------------------------
+        if (useWeaponCD && player.getAttackStrengthScale(0F) < 1.0F) return;
+
+        // ---- Auto Crit: micro-jump one tick before attack ----------------------
+        if (autoCrit) {
+            boolean canCrit = player.isOnGround()
+                    && !player.isCrouching()
+                    && !player.isInWater()
+                    && !player.isOnLadder()
+                    && !player.isSprinting();
+            if (canCrit) {
+                int currentTick = (int)(mc.level.getGameTime() & 0x7FFFFFFF);
+                if (currentTick != critJumpedTick) {
+                    // Issue micro-jump; real attack next tick when airborne
+                    player.setDeltaMovement(
+                            player.getDeltaMovement().x,
+                            0.11,
+                            player.getDeltaMovement().z);
+                    critJumpedTick = currentTick;
+                    auraCooldown = 1; // wait one tick → airborne → crit
+                    return;
+                }
+                // Second tick: still mark not on ground → vanilla crit fires
+            }
+        }
+
+        // ---- Attack ------------------------------------------------------------
         mc.gameMode.attack(player, target);
         player.swing(Hand.MAIN_HAND);
-
-        int delay = Math.max(1, (int) fs.speed);
-        killAuraCooldown = delay;
+        auraCooldown = minDelay;
     }
 
-    /** Rotate player's yaw and pitch toward the target entity. */
-    private static void faceEntity(ClientPlayerEntity player, LivingEntity target) {
-        double dx = target.getX() - player.getX();
-        double dy = (target.getY() + target.getBbHeight() * 0.5)
-                  - (player.getY() + player.getEyeHeight());
-        double dz = target.getZ() - player.getZ();
+    // ---- Rotation helper -------------------------------------------------------
+    private void applyRotation(ClientPlayerEntity player, LivingEntity target, int camMode) {
+        if (camMode == 2) return; // SILENT — no rotation
+
+        double dx   = target.getX() - player.getX();
+        double dy   = (target.getY() + target.getBbHeight() * 0.5)
+                    - (player.getY() + player.getEyeHeight());
+        double dz   = target.getZ() - player.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
 
-        float yaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float pitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
+        float targetYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float targetPitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
 
-        player.yRot  = yaw;
-        player.xRot  = pitch;
-        player.yBodyRot = yaw;
-        player.yHeadRot = yaw;
-    }
-
-    private static boolean isValidTarget(LivingEntity e, PlayerEntity player, int style) {
-        if (e == player) return false;
-        if (!e.isAlive()) return false;
-        switch (style) {
-            case 0: // mobs only
-                return !(e instanceof PlayerEntity)
-                    && e.getType().getCategory() == net.minecraft.entity.EntityClassification.MONSTER;
-            case 1: // players only
-                return e instanceof PlayerEntity;
-            default: // all living
-                return true;
+        if (camMode == 0) {
+            // BODY_TRACK: body + head snap, but camera (xRot/yRot used for view)
+            // stays at savedYaw / savedPitch so 1st-person view is free.
+            // In 3rd-person the model visibly faces the enemy.
+            player.yBodyRot  = targetYaw;
+            player.yHeadRot  = targetYaw;
+            // Update saved values from current mouse input each tick
+            savedYaw   = player.yRot;
+            savedPitch = player.xRot;
+            // Do NOT touch player.yRot / player.xRot → free look
+        } else {
+            // FULL_LOCK: camera also snaps
+            player.yRot      = targetYaw;
+            player.xRot      = targetPitch;
+            player.yBodyRot  = targetYaw;
+            player.yHeadRot  = targetYaw;
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Crit
-    //
-    // In vanilla, a critical hit requires the player to be falling (not on ground,
-    // not climbing, not in water, not sprinting). We trigger a micro-jump of 0.1
-    // blocks so the player is briefly airborne before the attack lands.
-    // Works by hooking into Kill Aura's attack timing OR the player's own swing.
-    // -------------------------------------------------------------------------
-    private void tickCrit(Minecraft mc, ClientPlayerEntity player) {
+    // ---- Target picker ---------------------------------------------------------
+    private static LivingEntity pickTarget(List<LivingEntity> list,
+                                           ClientPlayerEntity player, int sortMode) {
+        switch (sortMode) {
+            case 1: // lowest HP
+                return list.stream()
+                        .min(Comparator.comparingDouble(LivingEntity::getHealth))
+                        .orElse(null);
+            case 2: // highest HP
+                return list.stream()
+                        .max(Comparator.comparingDouble(LivingEntity::getHealth))
+                        .orElse(null);
+            default: // closest
+                return list.stream()
+                        .min(Comparator.comparingDouble(e -> e.distanceToSqr(player)))
+                        .orElse(null);
+        }
+    }
+
+    // ---- Target filter ---------------------------------------------------------
+    private static boolean isValidTarget(LivingEntity e, PlayerEntity player, int flags) {
+        if (e == player)   return false;
+        if (!e.isAlive())  return false;
+
+        boolean wantPlayers  = (flags & 0x04) != 0;
+        boolean wantHostile  = (flags & 0x08) != 0;
+        boolean wantPassive  = (flags & 0x10) != 0;
+
+        if (e instanceof PlayerEntity) return wantPlayers;
+
+        EntityClassification cat = e.getType().getCategory();
+        if (cat == EntityClassification.MONSTER) return wantHostile;
+        if (cat == EntityClassification.CREATURE
+         || cat == EntityClassification.AMBIENT
+         || cat == EntityClassification.WATER_CREATURE
+         || cat == EntityClassification.WATER_AMBIENT) return wantPassive;
+
+        return false;
+    }
+
+    // ============================================================
+    // STANDALONE CRIT  (when Kill Aura is off)
+    // ============================================================
+    private void tickStandaloneCrit(ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.CRIT)) return;
-
-        // If Kill Aura is also on it handles the swing; we just set up the jump.
-        // Detect a swing starting: attackStrengthScale drops below 1 (swing began).
-        float swingProgress = player.getAttackStrengthScale(0F);
-        boolean swinging = swingProgress < 0.9F;
-
+        boolean swinging = player.getAttackStrengthScale(0F) < 0.9F;
         if (swinging && player.isOnGround() && !player.isCrouching()
-                && !player.isInWater() && !player.isSprinting()) {
-            // Micro-jump: enough to make the next tick "falling"
+                && !player.isInWater() && !player.isOnLadder() && !player.isSprinting()) {
             player.setDeltaMovement(
                     player.getDeltaMovement().x,
-                    0.1,
+                    0.11,
                     player.getDeltaMovement().z);
-            critPending = true;
-        }
-
-        if (critPending && !player.isOnGround()) {
-            // We're airborne — next attack will crit automatically
-            critPending = false;
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Auto Clicker
-    //
-    // count = min CPS, speed = max CPS (both clamped 1–20).
-    // Each cycle picks a random interval between min and max for humanisation.
-    // Only clicks when LMB is held down (mc.options.keyAttack.isDown()).
-    // -------------------------------------------------------------------------
+    // ============================================================
+    // AUTO CLICKER
+    // ============================================================
     private void tickAutoClicker(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.AUTO_CLICKER)) {
             clickerTick = 0;
             return;
         }
-
-        // Only fire when the player is holding LMB
         if (!mc.options.keyAttack.isDown()) {
             clickerTick = 0;
             return;
         }
-
         clickerTick++;
         if (clickerTick >= clickerInterval) {
             clickerTick = 0;
-
             FeatureSettings fs = CosmeticsState.get().settings(FeatureType.AUTO_CLICKER);
             int minCps = Math.max(1, Math.min(20, (int) fs.count));
             int maxCps = Math.max(minCps, Math.min(20, (int) fs.speed));
-
-            // Randomise next interval for humanisation (20 ticks/sec)
-            int cps = minCps + (maxCps > minCps ? RNG.nextInt(maxCps - minCps + 1) : 0);
+            int cps    = minCps + (maxCps > minCps ? RNG.nextInt(maxCps - minCps + 1) : 0);
             clickerInterval = Math.max(1, 20 / cps);
-
-            // Simulate the click
             KeyBinding.click(mc.options.keyAttack.getKey());
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Auto Block
-    // -------------------------------------------------------------------------
+    // ============================================================
+    // AUTO BLOCK
+    // ============================================================
     private void tickAutoBlock(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.AUTO_BLOCK)) {
-            if (player.isUsingItem() && isShield(player.getUseItem())) {
-                player.stopUsingItem();
-            }
+            if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
             blockCooldown = 0;
             return;
         }
-
         Hand shieldHand = getShieldHand(player);
-        if (shieldHand == null) {
-            blockCooldown = 0;
-            return;
-        }
+        if (shieldHand == null) { blockCooldown = 0; return; }
 
         boolean justSwung = player.getAttackStrengthScale(0F) < 0.9F && !player.isUsingItem();
         if (justSwung) blockCooldown = BLOCK_LOWER_TICKS;
 
         if (blockCooldown > 0) {
             blockCooldown--;
-            if (player.isUsingItem() && isShield(player.getUseItem())) {
-                player.stopUsingItem();
-            }
+            if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
             return;
         }
 
-        boolean enemyNearby = hasEnemyNearby(mc, player);
-        if (enemyNearby) {
+        if (hasEnemyNearby(mc, player)) {
             if (!player.isUsingItem()) mc.gameMode.useItem(player, mc.level, shieldHand);
         } else {
             if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
@@ -264,20 +342,16 @@ public final class CombatHandler {
     }
 
     private static boolean hasEnemyNearby(Minecraft mc, ClientPlayerEntity player) {
-        List<LivingEntity> entities = mc.level.getEntitiesOfClass(
+        return !mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(BLOCK_RANGE),
-                e -> isHostile(e, player));
-        return !entities.isEmpty();
-    }
-
-    private static boolean isHostile(LivingEntity e, PlayerEntity player) {
-        if (e == player || !e.isAlive()) return false;
-        if (e instanceof PlayerEntity) return true;
-        net.minecraft.entity.MobEntity mob = (e instanceof net.minecraft.entity.MobEntity)
-                ? (net.minecraft.entity.MobEntity) e : null;
-        if (mob != null && mob.getTarget() == player) return true;
-        return e.getType().getCategory() == net.minecraft.entity.EntityClassification.MONSTER;
+                e -> {
+                    if (e == player || !e.isAlive()) return false;
+                    if (e instanceof PlayerEntity) return true;
+                    MobEntity mob = (e instanceof MobEntity) ? (MobEntity) e : null;
+                    if (mob != null && mob.getTarget() == player) return true;
+                    return e.getType().getCategory() == EntityClassification.MONSTER;
+                }).isEmpty();
     }
 
     public static boolean shouldSuppressFireOverlay() {
