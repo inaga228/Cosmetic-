@@ -1,71 +1,226 @@
 package com.example.cosmetics.utility;
 
 import com.example.cosmetics.client.CosmeticsState;
+import com.example.cosmetics.feature.FeatureSettings;
 import com.example.cosmetics.feature.FeatureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ShieldItem;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.vector.Vector3d;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Handles combat utility features:
- *  - Auto Block  (shield up when enemy nearby, lower to attack, raise again)
- *  - No Hurt Cam (cancel screen shake on damage)
- *  - No Fire Overlay (cancel fire texture render when burning)
+ *  - Auto Block     (shield up when enemy nearby)
+ *  - No Fire Overlay
+ *  - Kill Aura      (auto-attack nearest entity)
+ *  - Crit           (micro-jump before swing to force critical hit)
+ *  - Auto Clicker   (simulate LMB clicks at configurable CPS)
  */
 public final class CombatHandler {
 
     private static final CombatHandler INSTANCE = new CombatHandler();
     public static CombatHandler get() { return INSTANCE; }
 
-    // Auto Block: how many ticks to keep shield lowered after an attack swing
+    private static final Random RNG = new Random();
+
+    // Auto Block
     private int blockCooldown = 0;
-    private static final int BLOCK_LOWER_TICKS = 6; // ~0.3s — enough for hit to register
-    private static final double BLOCK_RANGE = 6.0; // blocks distance to trigger
+    private static final int BLOCK_LOWER_TICKS = 6;
+    private static final double BLOCK_RANGE = 6.0;
+
+    // Kill Aura
+    private int killAuraCooldown = 0;
+
+    // Crit
+    private boolean critPending = false;
+
+    // Auto Clicker
+    private int clickerTick = 0;
+    private int clickerInterval = 4; // ticks between clicks, recalculated each cycle
 
     private CombatHandler() {}
 
     // -------------------------------------------------------------------------
-    // Called every client tick from ClientEvents
-    // -------------------------------------------------------------------------
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
-        tickAutoBlock(mc, mc.player);
-        tickNoFireOverlay(mc.player);
+        ClientPlayerEntity player = mc.player;
+
+        tickAutoBlock(mc, player);
+        tickNoFireOverlay(player);
+        tickKillAura(mc, player);
+        tickCrit(mc, player);
+        tickAutoClicker(mc, player);
     }
 
     // -------------------------------------------------------------------------
     // No Fire Overlay
-    // Vanilla renders fire on screen when player.getRemainingFireTicks() > 0.
-    // We zero the visual fire ticks client-side each tick — damage is already
-    // applied server-side so this only removes the overlay, not the damage.
     // -------------------------------------------------------------------------
-    private static void tickNoFireOverlay(net.minecraft.client.entity.player.ClientPlayerEntity player) {
+    private static void tickNoFireOverlay(ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) return;
         if (player.getRemainingFireTicks() > 0) {
             player.setRemainingFireTicks(0);
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Kill Aura
+    //
+    // style 0 = mobs only, style 1 = players only, style 2 = all living entities
+    // speed = attack cooldown in ticks (min 1)
+    // -------------------------------------------------------------------------
+    private void tickKillAura(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
+            killAuraCooldown = 0;
+            return;
+        }
+
+        if (killAuraCooldown > 0) {
+            killAuraCooldown--;
+            return;
+        }
+
+        FeatureSettings fs = CosmeticsState.get().settings(FeatureType.KILL_AURA);
+        int style = Math.floorMod(fs.style, 3);
+        double range = 4.5; // standard melee range
+
+        List<LivingEntity> targets = mc.level.getEntitiesOfClass(
+                LivingEntity.class,
+                player.getBoundingBox().inflate(range),
+                e -> isValidTarget(e, player, style));
+
+        if (targets.isEmpty()) return;
+
+        // Attack closest
+        LivingEntity target = targets.stream()
+                .min(Comparator.comparingDouble(e -> e.distanceToSqr(player)))
+                .orElse(null);
+        if (target == null) return;
+
+        // Face target (snap yaw/pitch smoothly)
+        faceEntity(player, target);
+
+        // Attack
+        mc.gameMode.attack(player, target);
+        player.swing(Hand.MAIN_HAND);
+
+        int delay = Math.max(1, (int) fs.speed);
+        killAuraCooldown = delay;
+    }
+
+    /** Rotate player's yaw and pitch toward the target entity. */
+    private static void faceEntity(ClientPlayerEntity player, LivingEntity target) {
+        double dx = target.getX() - player.getX();
+        double dy = (target.getY() + target.getBbHeight() * 0.5)
+                  - (player.getY() + player.getEyeHeight());
+        double dz = target.getZ() - player.getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+
+        float yaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float pitch = (float)(-Math.toDegrees(Math.atan2(dy, dist)));
+
+        player.yRot  = yaw;
+        player.xRot  = pitch;
+        player.yBodyRot = yaw;
+        player.yHeadRot = yaw;
+    }
+
+    private static boolean isValidTarget(LivingEntity e, PlayerEntity player, int style) {
+        if (e == player) return false;
+        if (!e.isAlive()) return false;
+        switch (style) {
+            case 0: // mobs only
+                return !(e instanceof PlayerEntity)
+                    && e.getType().getCategory() == net.minecraft.entity.EntityClassification.MONSTER;
+            case 1: // players only
+                return e instanceof PlayerEntity;
+            default: // all living
+                return true;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Crit
+    //
+    // In vanilla, a critical hit requires the player to be falling (not on ground,
+    // not climbing, not in water, not sprinting). We trigger a micro-jump of 0.1
+    // blocks so the player is briefly airborne before the attack lands.
+    // Works by hooking into Kill Aura's attack timing OR the player's own swing.
+    // -------------------------------------------------------------------------
+    private void tickCrit(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.CRIT)) return;
+
+        // If Kill Aura is also on it handles the swing; we just set up the jump.
+        // Detect a swing starting: attackStrengthScale drops below 1 (swing began).
+        float swingProgress = player.getAttackStrengthScale(0F);
+        boolean swinging = swingProgress < 0.9F;
+
+        if (swinging && player.isOnGround() && !player.isCrouching()
+                && !player.isInWater() && !player.isSprinting()) {
+            // Micro-jump: enough to make the next tick "falling"
+            player.setDeltaMovement(
+                    player.getDeltaMovement().x,
+                    0.1,
+                    player.getDeltaMovement().z);
+            critPending = true;
+        }
+
+        if (critPending && !player.isOnGround()) {
+            // We're airborne — next attack will crit automatically
+            critPending = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Auto Clicker
+    //
+    // count = min CPS, speed = max CPS (both clamped 1–20).
+    // Each cycle picks a random interval between min and max for humanisation.
+    // Only clicks when LMB is held down (mc.options.keyAttack.isDown()).
+    // -------------------------------------------------------------------------
+    private void tickAutoClicker(Minecraft mc, ClientPlayerEntity player) {
+        if (!CosmeticsState.get().isOn(FeatureType.AUTO_CLICKER)) {
+            clickerTick = 0;
+            return;
+        }
+
+        // Only fire when the player is holding LMB
+        if (!mc.options.keyAttack.isDown()) {
+            clickerTick = 0;
+            return;
+        }
+
+        clickerTick++;
+        if (clickerTick >= clickerInterval) {
+            clickerTick = 0;
+
+            FeatureSettings fs = CosmeticsState.get().settings(FeatureType.AUTO_CLICKER);
+            int minCps = Math.max(1, Math.min(20, (int) fs.count));
+            int maxCps = Math.max(minCps, Math.min(20, (int) fs.speed));
+
+            // Randomise next interval for humanisation (20 ticks/sec)
+            int cps = minCps + (maxCps > minCps ? RNG.nextInt(maxCps - minCps + 1) : 0);
+            clickerInterval = Math.max(1, 20 / cps);
+
+            // Simulate the click
+            KeyBinding.click(mc.options.keyAttack.getKey());
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Auto Block
-    //
-    // Logic:
-    //  1. Player must have a shield in main or off hand.
-    //  2. If an enemy is within BLOCK_RANGE — start using the shield (raise it).
-    //  3. When the player swings (attackStrengthTicker resets to 0) — stop using
-    //     for BLOCK_LOWER_TICKS ticks so the hit registers, then raise again.
     // -------------------------------------------------------------------------
     private void tickAutoBlock(Minecraft mc, ClientPlayerEntity player) {
         if (!CosmeticsState.get().isOn(FeatureType.AUTO_BLOCK)) {
-            // Release shield if we were holding it
             if (player.isUsingItem() && isShield(player.getUseItem())) {
                 player.stopUsingItem();
             }
@@ -73,42 +228,28 @@ public final class CombatHandler {
             return;
         }
 
-        // Need a shield somewhere
         Hand shieldHand = getShieldHand(player);
         if (shieldHand == null) {
             blockCooldown = 0;
             return;
         }
 
-        // Detect attack swing: attackStrengthTicker < 1 means just swung
-        boolean justSwung = player.getAttackStrengthScale(0F) < 0.9F
-                && !player.isUsingItem();
-        if (justSwung) {
-            blockCooldown = BLOCK_LOWER_TICKS;
-        }
+        boolean justSwung = player.getAttackStrengthScale(0F) < 0.9F && !player.isUsingItem();
+        if (justSwung) blockCooldown = BLOCK_LOWER_TICKS;
 
         if (blockCooldown > 0) {
             blockCooldown--;
-            // Keep shield down during cooldown
             if (player.isUsingItem() && isShield(player.getUseItem())) {
                 player.stopUsingItem();
             }
             return;
         }
 
-        // Check if there's a hostile entity nearby
         boolean enemyNearby = hasEnemyNearby(mc, player);
-
         if (enemyNearby) {
-            if (!player.isUsingItem()) {
-                // Raise shield
-                mc.gameMode.useItem(player, mc.level, shieldHand);
-            }
+            if (!player.isUsingItem()) mc.gameMode.useItem(player, mc.level, shieldHand);
         } else {
-            // No enemy — lower shield
-            if (player.isUsingItem() && isShield(player.getUseItem())) {
-                player.stopUsingItem();
-            }
+            if (player.isUsingItem() && isShield(player.getUseItem())) player.stopUsingItem();
         }
     }
 
@@ -131,24 +272,14 @@ public final class CombatHandler {
     }
 
     private static boolean isHostile(LivingEntity e, PlayerEntity player) {
-        if (e == player) return false;
-        if (!e.isAlive()) return false;
-        // Other players count as threats
+        if (e == player || !e.isAlive()) return false;
         if (e instanceof PlayerEntity) return true;
-        // Mobs that have a target set to the player
         net.minecraft.entity.MobEntity mob = (e instanceof net.minecraft.entity.MobEntity)
                 ? (net.minecraft.entity.MobEntity) e : null;
         if (mob != null && mob.getTarget() == player) return true;
-        // Classic hostile mob categories
-        net.minecraft.entity.EntityType<?> type = e.getType();
-        return type.getCategory() == net.minecraft.entity.EntityClassification.MONSTER;
+        return e.getType().getCategory() == net.minecraft.entity.EntityClassification.MONSTER;
     }
 
-
-    // -------------------------------------------------------------------------
-    // No Fire Overlay — called from RenderGameOverlayEvent.Pre
-    // Returns true if the fire overlay render should be cancelled
-    // -------------------------------------------------------------------------
     public static boolean shouldSuppressFireOverlay() {
         return CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY);
     }

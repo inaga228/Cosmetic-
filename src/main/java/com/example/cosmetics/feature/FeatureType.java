@@ -49,7 +49,14 @@ public enum FeatureType {
 
     // Combat helpers
     AUTO_BLOCK      ("Auto Block",       Category.COMBAT, 0),
-    NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0);
+    NO_FIRE_OVERLAY ("No Fire Overlay",  Category.COMBAT, 0),
+
+    // Kill Aura: SPEED = attack delay ticks, STYLE = target filter (0=mobs, 1=players, 2=all)
+    KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SPEED | Caps.STYLE),
+    // Crit: forces crits by micro-jumping before each swing
+    CRIT         ("Crit",         Category.COMBAT, 0),
+    // Auto Clicker: COUNT = min CPS, SPEED = max CPS
+    AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
