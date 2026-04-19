@@ -189,7 +189,7 @@ public final class UtilityHandler {
         placeTimer++;
         if (placeTimer >= FAST_PLACE_INTERVAL) {
             placeTimer = 0;
-            KeyBinding.click(mc.options.keyUse.key);
+            KeyBinding.click(mc.options.keyUse.getKey());
         }
     }
 }
