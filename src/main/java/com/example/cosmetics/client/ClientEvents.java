@@ -21,7 +21,6 @@ import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderHandEvent;
@@ -113,22 +112,6 @@ public final class ClientEvents {
             if (CombatHandler.shouldSuppressFireOverlay()) {
                 event.setCanceled(true);
             }
-        }
-    }
-
-    /**
-     * No Hurt Cam — zero out the camera tilt caused by damage.
-     * EntityViewRenderEvent.CameraSetup fires every frame; we override the roll
-     * if the vanilla code has applied a hurt-tilt (hurtTime > 0).
-     */
-    @SubscribeEvent
-    public static void onCameraSetup(EntityViewRenderEvent.CameraSetup event) {
-        if (!CombatHandler.shouldSuppressHurtCam()) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
-        if (mc.player.hurtTime > 0) {
-            // Vanilla tilts the camera via roll during hurtTime; reset it to 0.
-            event.setRoll(0F);
         }
     }
 

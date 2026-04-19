@@ -253,7 +253,7 @@ public final class UtilityHandler {
     // player clicking very fast themselves — no reflection, no packet hacks.
     // placeTimer throttles the rate: fires every FAST_PLACE_INTERVAL ticks.
     // -------------------------------------------------------------------------
-    private static final int FAST_PLACE_INTERVAL = 2; // click every 2 ticks = 10 clicks/sec
+    private static final int FAST_PLACE_INTERVAL = 1; // click every tick = 20 clicks/sec
 
     private void tickFastPlace(Minecraft mc, ClientPlayerEntity player, CosmeticsState state) {
         if (!state.isOn(FeatureType.FAST_PLACE)) {
