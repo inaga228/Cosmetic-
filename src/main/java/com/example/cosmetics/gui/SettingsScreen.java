@@ -65,16 +65,38 @@ public class SettingsScreen extends Screen {
         }
 
         if (feature.has(FeatureType.Caps.SIZE)) {
-            sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Size", 0.25F, 3F,
-                    () -> fs.size, v -> fs.size = v));
+            if (feature == FeatureType.SMOOTH_AIM) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "FOV", 1F, 360F,
+                        () -> fs.size, v -> fs.size = v));
+            } else if (feature == FeatureType.KILL_AURA) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Range", 0.5F, 10F,
+                        () -> fs.size, v -> fs.size = v));
+            } else {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Size", 0.25F, 3F,
+                        () -> fs.size, v -> fs.size = v));
+            }
         }
         if (feature.has(FeatureType.Caps.DENSITY)) {
             sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Density", 0F, 3F,
                     () -> fs.density, v -> fs.density = v));
         }
         if (feature.has(FeatureType.Caps.SPEED)) {
-            sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Speed", 0.25F, 3F,
-                    () -> fs.speed, v -> fs.speed = v));
+            if (feature == FeatureType.SMOOTH_AIM) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Smoothness", 1F, 20F,
+                        () -> fs.speed, v -> fs.speed = v));
+            } else if (feature == FeatureType.KILL_AURA) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Delay (ticks)", 1F, 40F,
+                        () -> fs.speed, v -> fs.speed = v));
+            } else if (feature == FeatureType.AUTO_CLICKER) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Max CPS", 1F, 20F,
+                        () -> fs.speed, v -> fs.speed = v));
+            } else if (feature == FeatureType.STRAFE) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Speed", 0.5F, 5F,
+                        () -> fs.speed, v -> fs.speed = v));
+            } else {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Speed", 0.25F, 3F,
+                        () -> fs.speed, v -> fs.speed = v));
+            }
         }
         if (feature.has(FeatureType.Caps.COUNT)) {
             if (feature == FeatureType.CUSTOM_PLACE) {
@@ -97,6 +119,15 @@ public class SettingsScreen extends Screen {
                         return fs.count + " ♥";
                     }
                 });
+            } else if (feature == FeatureType.AUTO_POT || feature == FeatureType.AUTO_GAP) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "HP Trigger", 1F, 19F,
+                        () -> (float) fs.count, v -> fs.count = Math.round(v)) {
+                    @Override
+                    public String formatValue() { return fs.count + " ♥"; }
+                });
+            } else if (feature == FeatureType.AUTO_CLICKER) {
+                sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Min CPS", 1F, 20F,
+                        () -> (float) fs.count, v -> fs.count = Math.round(v)));
             } else {
                 sliders.add(new Slider(sx, sy + (i++) * rowH, sw, 17, "Count", 1F, 30F,
                         () -> (float) fs.count, v -> fs.count = Math.round(v)));
@@ -147,6 +178,7 @@ public class SettingsScreen extends Screen {
 
     private String[] getStyleLabels() {
         if (feature == FeatureType.CHINA_HAT)    return new String[]{"Cone", "Flat", "Wide"};
+        if (feature == FeatureType.KILL_AURA)    return new String[]{"Weapon CD", "Auto Crit", "Both"};
         if (feature == FeatureType.HIT_EFFECT)   return com.example.cosmetics.hit.HitEffectHandler.STYLE_NAMES;
         if (feature == FeatureType.COSMETICS_HUD) return com.example.cosmetics.hud.CosmeticsHud.STYLE_NAMES;
         if (feature == FeatureType.TARGET_HUD)   return com.example.cosmetics.hud.TargetHud.STYLE_NAMES;

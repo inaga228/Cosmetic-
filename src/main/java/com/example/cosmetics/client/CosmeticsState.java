@@ -61,11 +61,10 @@ public final class CosmeticsState {
             // Combat
             case HIT_EFFECT:    s.colorR = 1.00F; s.colorG = 0.20F; s.colorB = 0.20F; s.count = 8; break;
             case KILL_AURA:
-                s.speed      = 10F;   // 10 ticks between attacks by default
-                s.size       = 4.5F;  // range in blocks
-                s.style      = 0;     // camera: BODY_TRACK
-                s.style2     = 0;
-                s.extraFlags = 0x0A;  // weapon CD + hostile mobs
+                s.speed = 10F;  // 10 тиков между ударами
+                s.size  = 4.5F; // дальность в блоках
+                s.style = 0;    // 0=weapon CD, 1=auto crit, 2=оба
+                s.count = 0;    // 0=ближайший, 1=мало HP, 2=много HP
                 break;
             case AUTO_CLICKER:  s.count = 8; s.speed = 12F; break;   // 8-12 CPS
             case SMOOTH_AIM:    s.size = 90F; s.speed = 6F; break;    // FOV=90, speed=6

@@ -18,8 +18,8 @@ public class MainMenuScreen extends Screen {
     private static final String REPO_URL = "https://github.com/inaga228/Cosmetic-mod";
 
     // Layout
-    private static final int PANEL_W  = 400;
-    private static final int PANEL_H  = 280;
+    private static final int PANEL_W  = 320;
+    private static final int PANEL_H  = 220;
     private static final int TAB_W    = 96;
     private static final int CARD_H   = 22;
     private static final int CARD_GAP = 4;
@@ -151,14 +151,12 @@ public class MainMenuScreen extends Screen {
             // Skip if fully outside card area
             if (cy + CARD_H < cardY || cy > cardY + cardAreaH) continue;
 
-            // Fade cards near the edges
-            float visTop = cardY, visBot = cardY + cardAreaH;
-            float fadeRange = 12F;
-            float topFade = cy < visTop + fadeRange
-                    ? Math.max(0F, (cy - visTop) / fadeRange) : 1F;
+            // Fade только снизу когда скроллим (сверху не нужно — режет первые карточки)
+            float visBot = cardY + cardAreaH;
+            float fadeRange = 10F;
             float botFade = (cy + CARD_H) > visBot - fadeRange
                     ? Math.max(0F, (visBot - (cy + CARD_H)) / fadeRange) : 1F;
-            float fade = Math.min(topFade, botFade);
+            float fade = botFade;
 
             drawFeatureCard(ms, mouseX, mouseY, cardX, cy, cardW, CARD_H, f, anim * fade);
         }

@@ -7,7 +7,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityClassification;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -127,18 +126,18 @@ public final class CombatHandler {
         }
 
         FeatureSettings fs  = CosmeticsState.get().settings(FeatureType.KILL_AURA);
-        int   flags         = fs.extraFlags;
         int   sortMode      = Math.floorMod(fs.count, 3);
         float range         = Math.max(0.5F, Math.min(10F, fs.size));
         int   minDelay      = Math.max(1, (int) fs.speed);
-        boolean useWeaponCD = (flags & 0x01) != 0;
-        boolean autoCrit    = (flags & 0x02) != 0;
+        // style: 0 = weapon cooldown, 1 = auto crit, 2 = both
+        boolean useWeaponCD = fs.style == 0 || fs.style == 2;
+        boolean autoCrit    = fs.style == 1 || fs.style == 2;
 
-        // ---- Find target -------------------------------------------------------
+        // ---- Find target — атакуем всех живых кроме себя ----------------------
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(range),
-                e -> isValidTarget(e, player, flags));
+                e -> isValidTarget(e, player));
 
         if (candidates.isEmpty()) {
             auraCooldown = 0;
@@ -213,39 +212,16 @@ public final class CombatHandler {
     }
 
     // ---- Target filter ---------------------------------------------------------
-    private static boolean isValidTarget(LivingEntity e, PlayerEntity player, int flags) {
-        if (e == player)   return false;
-        if (!e.isAlive())  return false;
-
-        // Anti Bot: пропускаем сущности без имени или невидимые (типичные боты)
-        if (CosmeticsState.get().isOn(FeatureType.ANTI_BOT)) {
-            if (e instanceof PlayerEntity) {
-                // Боты обычно: нет скина (невозможно проверить на клиенте надёжно),
-                // зато часто невидимы или имеют пустое отображаемое имя
-                if (e.isInvisible()) return false;
-                if (e.getName().getString().isEmpty()) return false;
-                // Боты часто не двигаются — проверяем дельту движения
-                double motion = e.getDeltaMovement().lengthSqr();
-                // Полностью статичные сущности (motion == 0 несколько тиков) — пропускаем
-                // (упрощённая проверка: если совсем нет движения и нет имени над головой)
-                if (motion == 0 && !e.hasCustomName()) return false;
-            }
+    private static boolean isValidTarget(LivingEntity e, PlayerEntity player) {
+        if (e == player)  return false;
+        if (!e.isAlive()) return false;
+        // Anti Bot фильтр
+        if (CosmeticsState.get().isOn(FeatureType.ANTI_BOT) && e instanceof PlayerEntity) {
+            if (e.isInvisible()) return false;
+            if (e.getName().getString().isEmpty()) return false;
+            if (e.getDeltaMovement().lengthSqr() == 0 && !e.hasCustomName()) return false;
         }
-
-        boolean wantPlayers  = (flags & 0x04) != 0;
-        boolean wantHostile  = (flags & 0x08) != 0;
-        boolean wantPassive  = (flags & 0x10) != 0;
-
-        if (e instanceof PlayerEntity) return wantPlayers;
-
-        EntityClassification cat = e.getType().getCategory();
-        if (cat == EntityClassification.MONSTER) return wantHostile;
-        if (cat == EntityClassification.CREATURE
-         || cat == EntityClassification.AMBIENT
-         || cat == EntityClassification.WATER_CREATURE
-         || cat == EntityClassification.WATER_AMBIENT) return wantPassive;
-
-        return false;
+        return true;
     }
 
     // ============================================================
@@ -376,7 +352,7 @@ public final class CombatHandler {
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(range),
-                e -> isValidTarget(e, player, flags));
+                e -> isValidTarget(e, player));
         if (candidates.isEmpty()) return;
 
         LivingEntity target = candidates.stream()
@@ -451,16 +427,22 @@ public final class CombatHandler {
             inv.set(potSlot, tmp.isEmpty() ? ItemStack.EMPTY : tmp);
         }
 
+        // Смотрим вниз чтобы зелье упало под ноги
+        float origPitch = player.xRot;
+        float origYaw   = player.yRot;
+        player.xRot = 90F; // смотрим прямо вниз
+
         player.inventory.selected = hotbarSlot;
         mc.getConnection().send(new CHeldItemChangePacket(hotbarSlot));
-        // Бросить зелье (правая кнопка мыши)
         mc.gameMode.useItem(player, mc.level, Hand.MAIN_HAND);
 
-        // Восстанавливаем слот
+        // Восстанавливаем взгляд и слот
+        player.xRot = origPitch;
+        player.yRot = origYaw;
         player.inventory.selected = prev;
         mc.getConnection().send(new CHeldItemChangePacket(prev));
 
-        potCooldown = 20; // кулдаун 1 секунда
+        potCooldown = 30; // кулдаун 1.5 секунды
     }
 
     // ============================================================
