@@ -68,13 +68,17 @@ public final class FeatureSettings {
 
     // ---- Strafe -------------------------------------------------------------
     public int     strafeDirection          = 2; // 0=Left 1=Right 2=Random
-    public int     strafeMode               = 0; // 0=Circle 1=Side 2=Zigzag
+    public int     strafeMode               = 0; // 0=Circle 1=Side 2=Zigzag 3=Predictive
     public float   strafeRadius             = 2.5F;
     public boolean strafeOnlyInCombat       = true;
     public boolean strafeSprint             = true;
     public boolean strafeJitter             = false; // мелкое смещение против предсказания
 
     // ---- Kill Aura extended -------------------------------------------------
+    public boolean killAuraPauseOnChat      = true;  // пауза при открытом чате
+    public boolean killAuraAttackCreative   = false; // атаковать игроков в креативе
+    public boolean killAuraAutoBlock        = false; // авто-блок после атаки (ПКМ)
+    public boolean killAuraIgnoreAlreadyTargeted = false; // не атаковать уже атакуемых
     public float   killAuraMinRange         = 0.5F;
     public boolean killAuraIgnoreWalls      = false;
     public boolean killAuraSwing            = true;

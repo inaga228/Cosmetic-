@@ -108,6 +108,7 @@ public final class CombatHandler {
 
         // Паузы
         if (mc.screen != null) return;
+        if (fs.killAuraPauseOnChat && mc.screen instanceof net.minecraft.client.gui.screen.ChatScreen) return;
         if (fs.killAuraNoAttackOnUse && player.isUsingItem()) return;
 
         // Поиск целей
@@ -187,7 +188,12 @@ public final class CombatHandler {
             if (!isPlayer && !isHostile && !isPassive)  return false;
 
             if (!fs.killAuraAttackInvisible && e.isInvisible()) return false;
+            if (!fs.killAuraAttackCreative && isPlayer && ((PlayerEntity)e).isCreative()) return false;
             if (e.getHealth() > fs.killAuraMaxHealthTarget) return false;
+
+            // Не атаковать уже атакуемую цель
+            if (fs.killAuraIgnoreAlreadyTargeted && e.getLastHurtByMob() != null
+                    && e.getLastHurtByMob() != player) return false;
 
             // AntiBot
             if (fs.killAuraAntiBot && isPlayer) {
@@ -346,6 +352,9 @@ public final class CombatHandler {
         } else {
             mc.gameMode.attack(player, target);
             if (fs.killAuraSwing) player.swing(Hand.MAIN_HAND);
+        }
+        if (fs.killAuraAutoBlock) {
+            mc.gameMode.useItem(player, mc.level, Hand.MAIN_HAND);
         }
     }
 
@@ -537,6 +546,27 @@ public final class CombatHandler {
                         sideZ * baseSpd * spdNoise + (ddz / len) * jit);
                 player.yRot = lerpAngle(player.yRot,
                         (float)(Math.toDegrees(Math.atan2(ddz, ddx)) - 90.0), 0.2F);
+                break;
+            }
+            case 3: { // PREDICTIVE — предсказывает движение цели и движется наперерез
+                Vector3d targetVel  = target.getDeltaMovement();
+                Vector3d predicted  = target.position().add(targetVel.scale(0.5));
+                double px  = predicted.x;
+                double pz  = predicted.z;
+                double dxp = px - player.getX();
+                double dzp = pz - player.getZ();
+                double lenp = Math.sqrt(dxp * dxp + dzp * dzp);
+                if (lenp > 0.05) {
+                    double baseSpdP = 0.27 + (speed - 1) * 0.025;
+                    double noiseP   = 1.0 + (RNG.nextDouble() - 0.5) * 0.1;
+                    double mv = Math.min(lenp, baseSpdP * noiseP);
+                    player.setDeltaMovement((dxp / lenp) * mv, player.getDeltaMovement().y, (dzp / lenp) * mv);
+                }
+                // Смотрим на цель
+                double fdx = target.getX() - player.getX();
+                double fdz = target.getZ() - player.getZ();
+                player.yRot = lerpAngle(player.yRot,
+                        (float)(Math.toDegrees(Math.atan2(fdz, fdx)) - 90.0), 0.2F);
                 break;
             }
         }
