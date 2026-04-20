@@ -15,6 +15,9 @@ import com.example.cosmetics.hud.TargetHud;
 import com.example.cosmetics.particles.ParticleManager;
 import com.example.cosmetics.render.EspRenderer;
 import com.example.cosmetics.render.CapeRenderer;
+import com.example.cosmetics.combat.TriggerBot;
+import com.example.cosmetics.combat.BowAimbot;
+import com.example.cosmetics.combat.HitboxExpander;
 import com.example.cosmetics.render.HandRenderer;
 import com.example.cosmetics.render.HatRenderer;
 import com.example.cosmetics.render.TrailRenderer;
@@ -80,6 +83,9 @@ public final class ClientEvents {
         detectJumpAndLanding(mc.player);
         UtilityHandler.get().tick();
         CombatHandler.get().tick();
+        TriggerBot.get().tick();
+        BowAimbot.get().tick();
+        HitboxExpander.get().tick();
         CapeRenderer.get().tick();
         // Бинды на клавиши
         long win = mc.getWindow().getWindow();

@@ -166,7 +166,33 @@ public final class ConfigManager {
             + "\"espSkeleton\":"        + s.espSkeleton + ","
             + "\"espTargetPlayers\":"   + s.espTargetPlayers + ","
             + "\"espTargetHostile\":"   + s.espTargetHostile + ","
-            + "\"espTargetPassive\":"   + s.espTargetPassive
+            + "\"espTargetPassive\":"   + s.espTargetPassive + ","
+            + "\"triggerDelay\":"       + s.triggerDelay + ","
+            + "\"triggerDelayRand\":"   + s.triggerDelayRand + ","
+            + "\"triggerFov\":"         + s.triggerFov + ","
+            + "\"triggerNeedWeapon\":"  + s.triggerNeedWeapon + ","
+            + "\"triggerOnlyCharged\":" + s.triggerOnlyCharged + ","
+            + "\"triggerAutoRelease\":" + s.triggerAutoRelease + ","
+            + "\"triggerCancelOnMove\":" + s.triggerCancelOnMove + ","
+            + "\"triggerTargetPlayers\":" + s.triggerTargetPlayers + ","
+            + "\"triggerTargetHostile\":" + s.triggerTargetHostile + ","
+            + "\"triggerTargetPassive\":" + s.triggerTargetPassive + ","
+            + "\"bowAimFov\":"          + s.bowAimFov + ","
+            + "\"bowAimSpeed\":"        + s.bowAimSpeed + ","
+            + "\"bowAimLead\":"         + s.bowAimLead + ","
+            + "\"bowAimGravity\":"      + s.bowAimGravity + ","
+            + "\"bowAimPredictSteps\":" + s.bowAimPredictSteps + ","
+            + "\"bowAimTargetPlayers\":" + s.bowAimTargetPlayers + ","
+            + "\"bowAimTargetHostile\":" + s.bowAimTargetHostile + ","
+            + "\"bowAimOnlyCharged\":"  + s.bowAimOnlyCharged + ","
+            + "\"hitboxX\":"            + s.hitboxX + ","
+            + "\"hitboxY\":"            + s.hitboxY + ","
+            + "\"hitboxZ\":"            + s.hitboxZ + ","
+            + "\"hitboxTargetPlayers\":" + s.hitboxTargetPlayers + ","
+            + "\"hitboxTargetHostile\":" + s.hitboxTargetHostile + ","
+            + "\"hitboxTargetPassive\":" + s.hitboxTargetPassive + ","
+            + "\"hitboxOnlyInCombat\":" + s.hitboxOnlyInCombat + ","
+            + "\"hitboxDebug\":"        + s.hitboxDebug
             + "}";
     }
 
@@ -207,6 +233,32 @@ public final class ConfigManager {
         s.espTargetPlayers      = getBool(block, "espTargetPlayers",s.espTargetPlayers);
         s.espTargetHostile      = getBool(block, "espTargetHostile",s.espTargetHostile);
         s.espTargetPassive      = getBool(block, "espTargetPassive",s.espTargetPassive);
+        s.triggerDelay          = (long) getFloat(block, "triggerDelay",      (float) s.triggerDelay);
+        s.triggerDelayRand      = getFloat(block, "triggerDelayRand",          s.triggerDelayRand);
+        s.triggerFov            = getFloat(block, "triggerFov",                s.triggerFov);
+        s.triggerNeedWeapon     = getBool(block, "triggerNeedWeapon",          s.triggerNeedWeapon);
+        s.triggerOnlyCharged    = getBool(block, "triggerOnlyCharged",         s.triggerOnlyCharged);
+        s.triggerAutoRelease    = getBool(block, "triggerAutoRelease",         s.triggerAutoRelease);
+        s.triggerCancelOnMove   = getBool(block, "triggerCancelOnMove",        s.triggerCancelOnMove);
+        s.triggerTargetPlayers  = getBool(block, "triggerTargetPlayers",       s.triggerTargetPlayers);
+        s.triggerTargetHostile  = getBool(block, "triggerTargetHostile",       s.triggerTargetHostile);
+        s.triggerTargetPassive  = getBool(block, "triggerTargetPassive",       s.triggerTargetPassive);
+        s.bowAimFov             = getFloat(block, "bowAimFov",                 s.bowAimFov);
+        s.bowAimSpeed           = getFloat(block, "bowAimSpeed",               s.bowAimSpeed);
+        s.bowAimLead            = getFloat(block, "bowAimLead",                s.bowAimLead);
+        s.bowAimGravity         = getFloat(block, "bowAimGravity",             s.bowAimGravity);
+        s.bowAimPredictSteps    = (int) getFloat(block, "bowAimPredictSteps",  s.bowAimPredictSteps);
+        s.bowAimTargetPlayers   = getBool(block, "bowAimTargetPlayers",        s.bowAimTargetPlayers);
+        s.bowAimTargetHostile   = getBool(block, "bowAimTargetHostile",        s.bowAimTargetHostile);
+        s.bowAimOnlyCharged     = getBool(block, "bowAimOnlyCharged",          s.bowAimOnlyCharged);
+        s.hitboxX               = getFloat(block, "hitboxX",                   s.hitboxX);
+        s.hitboxY               = getFloat(block, "hitboxY",                   s.hitboxY);
+        s.hitboxZ               = getFloat(block, "hitboxZ",                   s.hitboxZ);
+        s.hitboxTargetPlayers   = getBool(block, "hitboxTargetPlayers",        s.hitboxTargetPlayers);
+        s.hitboxTargetHostile   = getBool(block, "hitboxTargetHostile",        s.hitboxTargetHostile);
+        s.hitboxTargetPassive   = getBool(block, "hitboxTargetPassive",        s.hitboxTargetPassive);
+        s.hitboxOnlyInCombat    = getBool(block, "hitboxOnlyInCombat",         s.hitboxOnlyInCombat);
+        s.hitboxDebug           = getBool(block, "hitboxDebug",                s.hitboxDebug);
     }
 
     private static float getFloat(String json, String key, float def) {

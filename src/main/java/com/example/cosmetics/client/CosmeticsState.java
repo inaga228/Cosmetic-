@@ -97,6 +97,38 @@ public final class CosmeticsState {
                 s.espTargetPassive = false;
                 break;
 
+            case TRIGGER_BOT:
+                s.triggerDelay = 80L;
+                s.triggerDelayRand = 40F;
+                s.triggerFov = 10F;
+                s.triggerTargetPlayers = true;
+                s.triggerTargetHostile = true;
+                s.triggerNeedWeapon = true;
+                s.triggerOnlyCharged = true;
+                s.triggerAutoRelease = true;
+                break;
+
+            case BOW_AIMBOT:
+                s.bowAimFov = 60F;
+                s.bowAimSpeed = 8F;
+                s.bowAimLead = 1.0F;
+                s.bowAimGravity = 1.0F;
+                s.bowAimPredictSteps = 4;
+                s.bowAimTargetPlayers = true;
+                s.bowAimTargetHostile = true;
+                s.bowAimOnlyCharged = true;
+                break;
+
+            case HITBOX:
+                s.hitboxX = 1.5F;
+                s.hitboxY = 1.2F;
+                s.hitboxZ = 1.5F;
+                s.hitboxTargetPlayers = true;
+                s.hitboxTargetHostile = true;
+                s.hitboxTargetPassive = false;
+                s.hitboxOnlyInCombat = false;
+                break;
+
             default: break;
         }
     }

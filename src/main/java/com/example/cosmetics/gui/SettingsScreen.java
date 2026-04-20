@@ -279,8 +279,101 @@ public class SettingsScreen extends Screen {
                     () -> fs.totemShowAlert, v -> fs.totemShowAlert = v));
         }
 
-        // ---- ESP -------------------------------------------------------------
-        else if (feature == FeatureType.ESP) {
+        // ---- TriggerBot ------------------------------------------------------
+        else if (feature == FeatureType.TRIGGER_BOT) {
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Delay ms", 0F, 500F,
+                    () -> (float) fs.triggerDelay, v -> fs.triggerDelay = (long) v) {
+                @Override public String formatValue() {
+                    return fs.triggerDelay == 0 ? "0 ms (instant)" : fs.triggerDelay + " ms";
+                }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Delay Rand ±ms", 0F, 300F,
+                    () -> fs.triggerDelayRand, v -> fs.triggerDelayRand = v) {
+                @Override public String formatValue() {
+                    return fs.triggerDelayRand < 1F ? "Off" : String.format("±%.0f ms", fs.triggerDelayRand);
+                }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "FOV (°)", 1F, 30F,
+                    () -> fs.triggerFov, v -> fs.triggerFov = v) {
+                @Override public String formatValue() { return String.format("%.1f°", fs.triggerFov); }
+            });
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Need Weapon",
+                    () -> fs.triggerNeedWeapon, v -> fs.triggerNeedWeapon = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Only Full Charge",
+                    () -> fs.triggerOnlyCharged, v -> fs.triggerOnlyCharged = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Single Clicks (not hold)",
+                    () -> fs.triggerAutoRelease, v -> fs.triggerAutoRelease = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Cancel On Move",
+                    () -> fs.triggerCancelOnMove, v -> fs.triggerCancelOnMove = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Players",
+                    () -> fs.triggerTargetPlayers, v -> fs.triggerTargetPlayers = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Hostile",
+                    () -> fs.triggerTargetHostile, v -> fs.triggerTargetHostile = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Passive",
+                    () -> fs.triggerTargetPassive, v -> fs.triggerTargetPassive = v));
+        }
+
+        // ---- Bow Aimbot ------------------------------------------------------
+        else if (feature == FeatureType.BOW_AIMBOT) {
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "FOV (°)", 5F, 180F,
+                    () -> fs.bowAimFov, v -> fs.bowAimFov = v) {
+                @Override public String formatValue() { return String.format("%.0f°", fs.bowAimFov); }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Aim Speed", 1F, 20F,
+                    () -> fs.bowAimSpeed, v -> fs.bowAimSpeed = v) {
+                @Override public String formatValue() {
+                    if (fs.bowAimSpeed >= 19F) return "Instant";
+                    return String.format("%.1f", fs.bowAimSpeed);
+                }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Lead (prediction)", 0F, 2F,
+                    () -> fs.bowAimLead, v -> fs.bowAimLead = v) {
+                @Override public String formatValue() {
+                    if (fs.bowAimLead < 0.05F) return "Off";
+                    return String.format("%.2fx", fs.bowAimLead);
+                }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Gravity scale", 0.1F, 3F,
+                    () -> fs.bowAimGravity, v -> fs.bowAimGravity = v) {
+                @Override public String formatValue() { return String.format("%.2fx", fs.bowAimGravity); }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Predict iterations", 1F, 8F,
+                    () -> (float) fs.bowAimPredictSteps, v -> fs.bowAimPredictSteps = Math.round(v)) {
+                @Override public String formatValue() { return fs.bowAimPredictSteps + " iters"; }
+            });
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Only Full Charge",
+                    () -> fs.bowAimOnlyCharged, v -> fs.bowAimOnlyCharged = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Players",
+                    () -> fs.bowAimTargetPlayers, v -> fs.bowAimTargetPlayers = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Hostile",
+                    () -> fs.bowAimTargetHostile, v -> fs.bowAimTargetHostile = v));
+        }
+
+        // ---- Hitbox ----------------------------------------------------------
+        else if (feature == FeatureType.HITBOX) {
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Scale X", 1.0F, 5F,
+                    () -> fs.hitboxX, v -> fs.hitboxX = v) {
+                @Override public String formatValue() { return String.format("%.2fx", fs.hitboxX); }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Scale Y", 1.0F, 5F,
+                    () -> fs.hitboxY, v -> fs.hitboxY = v) {
+                @Override public String formatValue() { return String.format("%.2fx", fs.hitboxY); }
+            });
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Scale Z", 1.0F, 5F,
+                    () -> fs.hitboxZ, v -> fs.hitboxZ = v) {
+                @Override public String formatValue() { return String.format("%.2fx", fs.hitboxZ); }
+            });
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Players",
+                    () -> fs.hitboxTargetPlayers, v -> fs.hitboxTargetPlayers = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Hostile",
+                    () -> fs.hitboxTargetHostile, v -> fs.hitboxTargetHostile = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Passive",
+                    () -> fs.hitboxTargetPassive, v -> fs.hitboxTargetPassive = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Only When Attacking",
+                    () -> fs.hitboxOnlyInCombat, v -> fs.hitboxOnlyInCombat = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Debug (show hitboxes)",
+                    () -> fs.hitboxDebug, v -> fs.hitboxDebug = v));
+        }
             cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Mode",
                     new String[]{"Box", "Cube", "Corners", "Glow"},
                     () -> fs.espMode, v -> fs.espMode = v));

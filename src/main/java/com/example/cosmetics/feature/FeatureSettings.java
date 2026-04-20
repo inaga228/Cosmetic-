@@ -70,6 +70,38 @@ public final class FeatureSettings {
     // ---- Auto Totem ---------------------------------------------------------
     public boolean totemShowAlert           = true;
 
+    // ---- TriggerBot ---------------------------------------------------------
+    public long    triggerDelay         = 80L;   // мс задержки перед кликом
+    public float   triggerDelayRand     = 40F;   // рандом ±мс
+    public float   triggerFov           = 10F;   // угол прицела в градусах
+    public boolean triggerTargetPlayers = true;
+    public boolean triggerTargetHostile = true;
+    public boolean triggerTargetPassive = false;
+    public boolean triggerNeedWeapon    = true;
+    public boolean triggerOnlyCharged   = true;
+    public boolean triggerAutoRelease   = true;  // true=одиночные клики, false=удержание
+    public boolean triggerCancelOnMove  = false;
+
+    // ---- BowAimbot ----------------------------------------------------------
+    public float   bowAimFov            = 60F;   // угол поиска цели
+    public float   bowAimSpeed          = 8F;    // скорость наведения
+    public float   bowAimLead           = 1.0F;  // множитель опережения (0=нет, 1=полное)
+    public float   bowAimGravity        = 1.0F;  // множитель гравитации
+    public int     bowAimPredictSteps   = 4;     // кол-во итераций предсказания
+    public boolean bowAimTargetPlayers  = true;
+    public boolean bowAimTargetHostile  = true;
+    public boolean bowAimOnlyCharged    = true;  // только при полном заряде
+
+    // ---- Hitbox -------------------------------------------------------------
+    public float   hitboxX              = 1.5F;  // множитель по X
+    public float   hitboxY              = 1.2F;  // множитель по Y
+    public float   hitboxZ              = 1.5F;  // множитель по Z
+    public boolean hitboxTargetPlayers  = true;
+    public boolean hitboxTargetHostile  = true;
+    public boolean hitboxTargetPassive  = false;
+    public boolean hitboxOnlyInCombat   = false;
+    public boolean hitboxDebug          = false; // отрисовывать расширенные хитбоксы
+
     // ---- ESP ----------------------------------------------------------------
     /** Режим рисования: 0=Box 1=Cube 2=Corners 3=Glow */
     public int     espMode           = 0;

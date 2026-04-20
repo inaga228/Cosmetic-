@@ -49,7 +49,10 @@ public enum FeatureType {
     SMOOTH_AIM   ("Smooth Aim",   Category.COMBAT, Caps.SIZE | Caps.SPEED | Caps.BOOL),
     STRAFE       ("Strafe",       Category.COMBAT, Caps.SPEED | Caps.BOOL | Caps.STRAFE),
     ANTI_BOT     ("Anti Bot",     Category.COMBAT, 0),
-    HIT_EFFECT   ("Hit Effect",   Category.COMBAT, Caps.COLOR | Caps.SIZE | Caps.COUNT | Caps.STYLE);
+    HIT_EFFECT   ("Hit Effect",   Category.COMBAT, Caps.COLOR | Caps.SIZE | Caps.COUNT | Caps.STYLE),
+    TRIGGER_BOT  ("Trigger Bot",  Category.COMBAT, Caps.TRIGGER),
+    BOW_AIMBOT   ("Bow Aimbot",   Category.COMBAT, Caps.BOWAIMBOT),
+    HITBOX       ("Hitbox",       Category.COMBAT, Caps.HITBOX);
 
     public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
 
@@ -63,9 +66,12 @@ public enum FeatureType {
         public static final int OFFSET   = 1 << 6;
         public static final int ROTATION = 1 << 7;
         public static final int BOOL     = 1 << 8;
-        public static final int KILLAURA = 1 << 9;  // расширенные настройки KillAura
-        public static final int STRAFE   = 1 << 10; // расширенные настройки Strafe
-        public static final int ESP      = 1 << 11; // расширенные настройки ESP
+        public static final int KILLAURA = 1 << 9;
+        public static final int STRAFE   = 1 << 10;
+        public static final int ESP      = 1 << 11;
+        public static final int TRIGGER  = 1 << 12;
+        public static final int BOWAIMBOT= 1 << 13;
+        public static final int HITBOX   = 1 << 14;
     }
 
     public final String displayName;
