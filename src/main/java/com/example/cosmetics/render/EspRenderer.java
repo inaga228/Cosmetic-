@@ -47,12 +47,12 @@ public final class EspRenderer {
     private EspRenderer() {}
 
     public static void render(RenderWorldLastEvent event) {
-        if (!CosmeticsState.get().isOn(FeatureType.ESP)) return;
+        return; // ESP disabled
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        FeatureSettings fs = CosmeticsState.get().settings(FeatureType.ESP);
+        FeatureSettings fs = new FeatureSettings(); // ESP disabled
         float maxRange = Math.max(5F, Math.min(256F, fs.size));
 
         ClientPlayerEntity self = mc.player;
