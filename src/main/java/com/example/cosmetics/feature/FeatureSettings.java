@@ -70,6 +70,20 @@ public final class FeatureSettings {
     // ---- Auto Totem ---------------------------------------------------------
     public boolean totemShowAlert           = true;
 
+    // ---- ESP ----------------------------------------------------------------
+    /** Режим рисования: 0=Box 1=Cube 2=Corners 3=Glow */
+    public int     espMode           = 0;
+    /** Цвет: 0=Custom 1=ByHP 2=ByType */
+    public int     espColorMode      = 2;
+    public boolean espShowHealth     = true;
+    public boolean espShowName       = true;
+    public boolean espShowDistance   = true;
+    public boolean espShowLine       = false;
+    public boolean espSkeleton       = false;
+    public boolean espTargetPlayers  = true;
+    public boolean espTargetHostile  = true;
+    public boolean espTargetPassive  = false;
+
     // ---- Legacy (kept for compat) -------------------------------------------
     public int style2     = 0;
     public int extraFlags = 0x0A;

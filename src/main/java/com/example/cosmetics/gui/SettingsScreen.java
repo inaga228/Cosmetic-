@@ -278,6 +278,36 @@ public class SettingsScreen extends Screen {
             toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Show Alert Message",
                     () -> fs.totemShowAlert, v -> fs.totemShowAlert = v));
         }
+
+        // ---- ESP -------------------------------------------------------------
+        else if (feature == FeatureType.ESP) {
+            cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Mode",
+                    new String[]{"Box", "Cube", "Corners", "Glow"},
+                    () -> fs.espMode, v -> fs.espMode = v));
+            cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Color Mode",
+                    new String[]{"Custom", "By HP", "By Type"},
+                    () -> fs.espColorMode, v -> fs.espColorMode = v));
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Max Range", 5F, 256F,
+                    () -> fs.size, v -> fs.size = v) {
+                @Override public String formatValue() { return String.format("%.0fm", fs.size); }
+            });
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Show Name",
+                    () -> fs.espShowName, v -> fs.espShowName = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Show Health Bar",
+                    () -> fs.espShowHealth, v -> fs.espShowHealth = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Show Distance",
+                    () -> fs.espShowDistance, v -> fs.espShowDistance = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Tracer Line",
+                    () -> fs.espShowLine, v -> fs.espShowLine = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Skeleton",
+                    () -> fs.espSkeleton, v -> fs.espSkeleton = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Players",
+                    () -> fs.espTargetPlayers, v -> fs.espTargetPlayers = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Hostile",
+                    () -> fs.espTargetHostile, v -> fs.espTargetHostile = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Passive",
+                    () -> fs.espTargetPassive, v -> fs.espTargetPassive = v));
+        }
     }
 
     // ── Layout helpers ─────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import com.example.cosmetics.gui.MainMenuScreen;
 import com.example.cosmetics.hud.CosmeticsHud;
 import com.example.cosmetics.hud.TargetHud;
 import com.example.cosmetics.particles.ParticleManager;
+import com.example.cosmetics.render.EspRenderer;
 import com.example.cosmetics.render.CapeRenderer;
 import com.example.cosmetics.render.HandRenderer;
 import com.example.cosmetics.render.HatRenderer;
@@ -129,6 +130,7 @@ public final class ClientEvents {
         HatRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         CapeRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         JumpCircles.get().renderAll(event.getMatrixStack(), event.getPartialTicks());
+        EspRenderer.render(event);
     }
 
     @SubscribeEvent

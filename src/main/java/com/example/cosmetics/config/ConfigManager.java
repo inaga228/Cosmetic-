@@ -156,7 +156,17 @@ public final class ConfigManager {
             + "\"strafeRadius\":" + s.strafeRadius + ","
             + "\"strafeOnlyInCombat\":" + s.strafeOnlyInCombat + ","
             + "\"strafeSprint\":" + s.strafeSprint + ","
-            + "\"strafeJitter\":" + s.strafeJitter
+            + "\"strafeJitter\":" + s.strafeJitter + ","
+            + "\"espMode\":"            + s.espMode + ","
+            + "\"espColorMode\":"       + s.espColorMode + ","
+            + "\"espShowHealth\":"      + s.espShowHealth + ","
+            + "\"espShowName\":"        + s.espShowName + ","
+            + "\"espShowDistance\":"    + s.espShowDistance + ","
+            + "\"espShowLine\":"        + s.espShowLine + ","
+            + "\"espSkeleton\":"        + s.espSkeleton + ","
+            + "\"espTargetPlayers\":"   + s.espTargetPlayers + ","
+            + "\"espTargetHostile\":"   + s.espTargetHostile + ","
+            + "\"espTargetPassive\":"   + s.espTargetPassive
             + "}";
     }
 
@@ -187,6 +197,16 @@ public final class ConfigManager {
         s.strafeOnlyInCombat    = getBool(block, "strafeOnlyInCombat",      s.strafeOnlyInCombat);
         s.strafeSprint          = getBool(block, "strafeSprint",            s.strafeSprint);
         s.strafeJitter          = getBool(block, "strafeJitter",            s.strafeJitter);
+        s.espMode               = (int) getFloat(block, "espMode",         s.espMode);
+        s.espColorMode          = (int) getFloat(block, "espColorMode",    s.espColorMode);
+        s.espShowHealth         = getBool(block, "espShowHealth",   s.espShowHealth);
+        s.espShowName           = getBool(block, "espShowName",     s.espShowName);
+        s.espShowDistance       = getBool(block, "espShowDistance", s.espShowDistance);
+        s.espShowLine           = getBool(block, "espShowLine",     s.espShowLine);
+        s.espSkeleton           = getBool(block, "espSkeleton",     s.espSkeleton);
+        s.espTargetPlayers      = getBool(block, "espTargetPlayers",s.espTargetPlayers);
+        s.espTargetHostile      = getBool(block, "espTargetHostile",s.espTargetHostile);
+        s.espTargetPassive      = getBool(block, "espTargetPassive",s.espTargetPassive);
     }
 
     private static float getFloat(String json, String key, float def) {

@@ -83,6 +83,20 @@ public final class CosmeticsState {
             // AUTO_TOTEM: count = HP threshold in hearts (default 6 hearts = 12 HP)
             case AUTO_TOTEM:    s.count = 6; break;
 
+            case ESP:
+                s.size = 64F;
+                s.espMode = 0;
+                s.espColorMode = 2;
+                s.espShowHealth = true;
+                s.espShowName = true;
+                s.espShowDistance = true;
+                s.espShowLine = false;
+                s.espSkeleton = false;
+                s.espTargetPlayers = true;
+                s.espTargetHostile = true;
+                s.espTargetPassive = false;
+                break;
+
             default: break;
         }
     }

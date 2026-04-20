@@ -42,6 +42,7 @@ public enum FeatureType {
 
     // Combat
     NO_FIRE_OVERLAY ("No Fire Overlay", Category.COMBAT, 0),
+    ESP          ("ESP",          Category.COMBAT, Caps.COLOR | Caps.SIZE | Caps.BOOL | Caps.ESP),
     KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SIZE | Caps.BOOL | Caps.KILLAURA),
     CRIT         ("Crit",         Category.COMBAT, 0),
     AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED | Caps.BOOL),
@@ -64,6 +65,7 @@ public enum FeatureType {
         public static final int BOOL     = 1 << 8;
         public static final int KILLAURA = 1 << 9;  // расширенные настройки KillAura
         public static final int STRAFE   = 1 << 10; // расширенные настройки Strafe
+        public static final int ESP      = 1 << 11; // расширенные настройки ESP
     }
 
     public final String displayName;
