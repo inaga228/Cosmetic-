@@ -188,6 +188,25 @@ public class SettingsScreen extends Screen {
 
         // ---- Kill Aura -------------------------------------------------------
         else if (feature == FeatureType.KILL_AURA) {
+            // Delay mode
+            cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Delay Mode",
+                    new String[]{"Tick Interval", "Full Cooldown"},
+                    () -> fs.killAuraDelayMode, v -> fs.killAuraDelayMode = v));
+            // Tick interval (только для ConstDelay)
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Tick Interval", 1F, 40F,
+                    () -> (float) fs.killAuraTickInterval, v -> fs.killAuraTickInterval = Math.round(v)) {
+                @Override public String formatValue() {
+                    return fs.killAuraTickInterval + " ticks (" + String.format("%.1f", fs.killAuraTickInterval / 20F) + "s)";
+                }
+            });
+            // Extra ticks (для Cooldown режима)
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Extra Ticks", -5F, 10F,
+                    () -> fs.killAuraExtraTicks, v -> fs.killAuraExtraTicks = v) {
+                @Override public String formatValue() {
+                    if (fs.killAuraExtraTicks == 0) return "0 (exact)";
+                    return String.format("%+.1f ticks", fs.killAuraExtraTicks);
+                }
+            });
             // Rotation & targeting
             cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Rotation Mode",
                     new String[]{"Body Track", "Full Lock", "Silent"},
@@ -198,11 +217,18 @@ public class SettingsScreen extends Screen {
             // Range
             sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Min Range", 0F, 4F,
                     () -> fs.killAuraMinRange, v -> fs.killAuraMinRange = v));
-            // FOV
-            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "FOV", 10F, 360F,
+            // FOV горизонтальный
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "FOV (horiz)", 10F, 360F,
                     () -> fs.killAuraFov, v -> fs.killAuraFov = v) {
                 @Override public String formatValue() {
                     return fs.killAuraFov >= 359F ? "360° (any)" : String.format("%.0f°", fs.killAuraFov);
+                }
+            });
+            // FOV вертикальный
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "FOV (vert)", 10F, 360F,
+                    () -> fs.killAuraVerticalFov, v -> fs.killAuraVerticalFov = v) {
+                @Override public String formatValue() {
+                    return fs.killAuraVerticalFov >= 359F ? "360° (any)" : String.format("%.0f°", fs.killAuraVerticalFov);
                 }
             });
             // Attack delay
@@ -219,6 +245,10 @@ public class SettingsScreen extends Screen {
                 }
             });
             // Toggles
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Attack All (Multi-Aura)",
+                    () -> fs.killAuraAttackAll, v -> fs.killAuraAttackAll = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "No Attack While Using Item",
+                    () -> fs.killAuraNoAttackOnUse, v -> fs.killAuraNoAttackOnUse = v));
             toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Auto Crit",
                     () -> fs.killAuraAutoCrit, v -> fs.killAuraAutoCrit = v));
             toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Players",

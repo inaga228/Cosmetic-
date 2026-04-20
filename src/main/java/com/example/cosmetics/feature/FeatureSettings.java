@@ -64,6 +64,20 @@ public final class FeatureSettings {
     public boolean killAuraSilentRotation   = false;
     public float   killAuraFov              = 180F; // угол обзора для поиска цели (180=любое направление)
 
+    // ---- Kill Aura (из cheatutils) ------------------------------------------
+    // delayMode: 0=ConstDelay (интервал в тиках), 1=Cooldown (ждать 100% заряда)
+    public int     killAuraDelayMode        = 0;
+    // attackTickInterval — каждые N тиков бить (только в режиме ConstDelay)
+    public int     killAuraTickInterval     = 5;
+    // extraTicks — смещение: чуть раньше 100% заряда (-) или позже (+) (только Cooldown)
+    public float   killAuraExtraTicks       = 0F;
+    // attackAll — мульти-аура: бить ВСЕХ в радиусе за один тик, а не только ближайшего
+    public boolean killAuraAttackAll        = false;
+    // doNotAttackOnItemUse — не атаковать пока игрок использует предмет (лук, еда...)
+    public boolean killAuraNoAttackOnUse    = false;
+    // maxVerticalAngle — отдельный FOV по вертикали (0 = выкл, используется killAuraFov)
+    public float   killAuraVerticalFov      = 360F;
+
     // ---- HUD ----------------------------------------------------------------
     public boolean hudOnlyWhenActive        = false;
 

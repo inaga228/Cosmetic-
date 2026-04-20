@@ -41,6 +41,8 @@ public final class CombatHandler {
     private boolean critJumpPending = false;
     private int  critJumpTick       = -999;
     private long auraNextAttackMs   = 0; // для ms-точной задержки
+    private long auraTicks          = 0; // счётчик тиков для ConstDelay режима
+    private long auraLastAttackTick = 0;
 
     // ---- Auto Clicker -------------------------------------------------------
     private int clickerTick     = 0;
@@ -75,14 +77,14 @@ public final class CombatHandler {
     // =========================================================================
     // KILL AURA
     //
-    // Логика cooldown:
-    //   - Получаем скорость атаки оружия (attackSpeed атрибут)
-    //   - Рассчитываем количество тиков для полного заряда (20 / attackSpeed)
-    //   - После каждого удара ставим свой таймер auraAttackCooldown
-    //   - Бьём только когда таймер = 0 И getAttackStrengthScale >= 1.0
-    //   - Так удары гарантированно идут и не застревают
+    // delayMode 0 = ConstDelay: бьём каждые killAuraTickInterval тиков
+    // delayMode 1 = Cooldown:   бьём только при getAttackStrengthScale == 1.0
+    //                           с поправкой на extraTicks
+    // attackAll = true:         бьём ВСЕХ целей в радиусе за тик (мульти-аура)
     // =========================================================================
     private void tickKillAura(Minecraft mc, ClientPlayerEntity player) {
+        auraTicks++;
+
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
             auraAttackCooldown = 0;
             critJumpPending    = false;
@@ -94,52 +96,82 @@ public final class CombatHandler {
         float range    = Math.max(0.5F, Math.min(10F, fs.size));
         float minRange = Math.max(0F, Math.min(range - 0.1F, fs.killAuraMinRange));
         float fov      = Math.max(10F, Math.min(360F, fs.killAuraFov));
+        float vFov     = Math.max(10F, Math.min(360F, fs.killAuraVerticalFov));
 
+        // ---- Проверка: использует ли игрок предмет (лук, еда и т.д.) --------
+        if (fs.killAuraNoAttackOnUse && player.isUsingItem()) return;
+
+        // ---- Проверка задержки (delayMode) -----------------------------------
+        if (!shouldKillAuraAttackNow(player, fs)) {
+            if (auraAttackCooldown > 0) auraAttackCooldown--;
+            return;
+        }
         if (auraAttackCooldown > 0) { auraAttackCooldown--; return; }
 
-        // ---- Поиск цели -------------------------------------------------------
+        // ---- Поиск целей -------------------------------------------------------
+        java.util.function.Predicate<net.minecraft.entity.Entity> filter = e -> {
+            if (!(e instanceof LivingEntity)) return false;
+            LivingEntity living = (LivingEntity) e;
+            if (!isValidKillAuraTarget(living, player, fs)) return false;
+            double dist = e.distanceTo(player);
+            if (dist < minRange) return false;
+            // FOV горизонтальный
+            if (fov < 360F) {
+                double dx = e.getX() - player.getX();
+                double dz = e.getZ() - player.getZ();
+                float needYaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+                if (Math.abs(wrapDeg(needYaw - player.yRot)) > fov / 2F) return false;
+            }
+            // FOV вертикальный
+            if (vFov < 360F) {
+                double dx = e.getX() - player.getX();
+                double dy = (e.getY() + e.getBbHeight() * 0.5) - (player.getY() + player.getEyeHeight());
+                double dz = e.getZ() - player.getZ();
+                double distXZ = Math.sqrt(dx * dx + dz * dz);
+                float needPitch = (float)(-Math.toDegrees(Math.atan2(dy, distXZ)));
+                if (Math.abs(needPitch - player.xRot) > vFov / 2F) return false;
+            }
+            // Raytrace — только при прямой видимости
+            if (fs.killAuraRaytrace) {
+                net.minecraft.util.math.vector.Vector3d eyePos = player.getEyePosition(1F);
+                net.minecraft.util.math.vector.Vector3d entPos = e.position().add(0, e.getBbHeight() * 0.5, 0);
+                net.minecraft.util.math.BlockRayTraceResult brt = mc.level.clip(
+                        new net.minecraft.util.math.RayTraceContext(
+                                eyePos, entPos,
+                                net.minecraft.util.math.RayTraceContext.BlockMode.COLLIDER,
+                                net.minecraft.util.math.RayTraceContext.FluidMode.NONE,
+                                player));
+                if (brt.getType() == net.minecraft.util.math.RayTraceResult.Type.BLOCK) return false;
+            }
+            return true;
+        };
+
         List<LivingEntity> candidates = mc.level.getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(range),
-                e -> {
-                    if (!isValidKillAuraTarget(e, player, fs)) return false;
-                    double dist = e.distanceTo(player);
-                    if (dist < minRange) return false;
-                    // FOV фильтр
-                    if (fov < 360F) {
-                        double dx = e.getX() - player.getX();
-                        double dz = e.getZ() - player.getZ();
-                        float needYaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-                        if (Math.abs(wrapDeg(needYaw - player.yRot)) > fov / 2F) return false;
-                    }
-                    // Raytrace — только при прямой видимости
-                    if (fs.killAuraRaytrace) {
-                        net.minecraft.util.math.vector.Vector3d eyePos =
-                                player.getEyePosition(1F);
-                        net.minecraft.util.math.vector.Vector3d entPos =
-                                e.position().add(0, e.getBbHeight() * 0.5, 0);
-                        net.minecraft.util.math.BlockRayTraceResult brt =
-                                mc.level.clip(new net.minecraft.util.math.RayTraceContext(
-                                        eyePos, entPos,
-                                        net.minecraft.util.math.RayTraceContext.BlockMode.COLLIDER,
-                                        net.minecraft.util.math.RayTraceContext.FluidMode.NONE,
-                                        player));
-                        if (brt.getType() == net.minecraft.util.math.RayTraceResult.Type.BLOCK)
-                            return false;
-                    }
-                    return true;
-                });
+                e -> filter.test(e));
 
         if (candidates.isEmpty()) { critJumpPending = false; return; }
 
-        LivingEntity target = pickTarget(candidates, player, fs.killAuraSortMode);
-        if (target == null) return;
+        // ---- Выбор целей (одна или все) ----------------------------------------
+        List<LivingEntity> targets;
+        if (fs.killAuraAttackAll) {
+            // Мульти-аура: сортируем по дистанции, бьём всех
+            targets = new java.util.ArrayList<>(candidates);
+            targets.sort(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(player)));
+        } else {
+            LivingEntity single = pickTarget(candidates, player, fs.killAuraSortMode);
+            if (single == null) return;
+            targets = java.util.Collections.singletonList(single);
+        }
+
+        LivingEntity primary = targets.get(0);
 
         // ---- Наведение -------------------------------------------------------
-        double dx   = target.getX() - player.getX();
-        double dy   = (target.getY() + target.getBbHeight() * 0.5)
+        double dx   = primary.getX() - player.getX();
+        double dy   = (primary.getY() + primary.getBbHeight() * 0.5)
                     - (player.getY() + player.getEyeHeight());
-        double dz   = target.getZ() - player.getZ();
+        double dz   = primary.getZ() - player.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
 
         float wantYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
@@ -157,14 +189,10 @@ public final class CombatHandler {
                 player.yBodyRot = wantYaw;
                 player.yHeadRot = wantYaw;
                 break;
-            // case 2: SILENT — ничего
+            // case 2: SILENT — ничего не меняем
         }
 
-        // ---- Ждём полного заряда --------------------------------------------
-        float charge = player.getAttackStrengthScale(0F);
-        if (charge < 1.0F) return;
-
-        // ---- Кастомная задержка атаки ----------------------------------------
+        // ---- Кастомная задержка атаки (ms) ------------------------------------
         if (fs.killAuraAttackDelay > 0 || fs.killAuraAttackDelayRand > 0) {
             long now = System.currentTimeMillis();
             if (now < auraNextAttackMs) return;
@@ -198,13 +226,41 @@ public final class CombatHandler {
         }
 
         // ---- Атака -----------------------------------------------------------
-        mc.gameMode.attack(player, target);
+        // Первую цель — через gameMode.attack (с визуальным эффектом)
+        mc.gameMode.attack(player, primary);
         if (fs.killAuraSwing) player.swing(Hand.MAIN_HAND);
+
+        // Остальные цели (мульти-аура) — тоже через gameMode.attack
+        // gameMode.attack внутри сам отправляет CUseEntityPacket серверу
+        for (int ti = 1; ti < targets.size(); ti++) {
+            mc.gameMode.attack(player, targets.get(ti));
+        }
+
+        auraLastAttackTick = auraTicks;
 
         double atkSpeed = player.getAttributeValue(
                 net.minecraft.entity.ai.attributes.Attributes.ATTACK_SPEED);
         int cooldownTicks = Math.max(1, (int) Math.ceil(20.0 / atkSpeed));
         auraAttackCooldown = cooldownTicks;
+    }
+
+    /**
+     * Проверяет можно ли сейчас атаковать в зависимости от delayMode.
+     * delayMode 0 = ConstDelay: каждые killAuraTickInterval тиков
+     * delayMode 1 = Cooldown:   когда getAttackStrengthScale с поправкой на extraTicks == 1.0
+     */
+    private boolean shouldKillAuraAttackNow(ClientPlayerEntity player, FeatureSettings fs) {
+        // Нельзя атаковать предметами без урона (ведро и т.д.)
+        ItemStack stack = player.getItemInHand(Hand.MAIN_HAND);
+        // Базовая проверка — не инструмент без атаки
+        if (fs.killAuraDelayMode == 1) {
+            // Cooldown режим: ждём полный заряд с поправкой extraTicks
+            return player.getAttackStrengthScale(-fs.killAuraExtraTicks) >= 1.0F;
+        } else {
+            // ConstDelay режим: интервал в тиках
+            int interval = Math.max(1, fs.killAuraTickInterval);
+            return (auraTicks - auraLastAttackTick) >= interval;
+        }
     }
 
     // ---- Фильтр целей --------------------------------------------------------
