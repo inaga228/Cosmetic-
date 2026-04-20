@@ -306,7 +306,7 @@ public final class CombatHandler {
     private static void sendRotationPacket(Minecraft mc, ClientPlayerEntity player,
                                             float yaw, float pitch) {
         if (mc.getConnection() == null) return;
-        mc.getConnection().send(new CPlayerPacket.Rotation(yaw, pitch, player.isOnGround()));
+        mc.getConnection().send(new CPlayerPacket.RotationPacket(yaw, pitch, player.isOnGround()));
     }
 
     private void restoreRotation(Minecraft mc, ClientPlayerEntity player) {
@@ -340,7 +340,7 @@ public final class CombatHandler {
         if (target == null) return;
         if (fs.killAuraSilentAttack) {
             if (mc.getConnection() != null) {
-                mc.getConnection().send(new CUseEntityPacket(target, Hand.MAIN_HAND));
+                mc.getConnection().send(new CUseEntityPacket(target, player.isCrouching()));
                 if (fs.killAuraSwing) player.swing(Hand.MAIN_HAND);
             }
         } else {
