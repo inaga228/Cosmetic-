@@ -24,8 +24,28 @@ public final class FeatureSettings {
     public boolean killAuraTargetHostile = true;
     public boolean killAuraTargetPassive = false;
     public boolean killAuraAntiBot       = false;
-    public int     killAuraRotMode       = 0; // 0=BodyTrack 1=FullLock 2=Silent
-    public int     killAuraSortMode      = 0; // 0=Closest 1=LowestHP 2=HighestHP
+    public int     killAuraRotMode       = 0; // 0=Off 1=Normal 2=Silent 3=ServerOnly
+    public int     killAuraSortMode      = 0; // 0=Closest 1=LowestHP 2=HighestHP 3=Angle
+
+    // Silent rotation
+    public boolean killAuraRandomizeAngles = false;
+    public float   killAuraAngleNoise      = 1.5F;
+    // Aim height: 0=ноги, 0.5=центр, 1.0=голова
+    public float   killAuraAimHeight       = 0.5F;
+
+    // Attack mode: 0=Single 1=Switch 2=Multi
+    public int     killAuraAttackMode      = 0;
+    // Silent attack (пакет напрямую)
+    public boolean killAuraSilentAttack    = false;
+
+    // Hit chance %
+    public int     killAuraHitChance       = 100;
+    // Гауссова задержка
+    public boolean killAuraRandomizeDelay  = false;
+    // Max health filter
+    public float   killAuraMaxHealthTarget = 999F;
+    // Атаковать невидимых
+    public boolean killAuraAttackInvisible = false;
 
     // ---- Trails -------------------------------------------------------------
     public boolean trailOnlyWhenMoving = false;
