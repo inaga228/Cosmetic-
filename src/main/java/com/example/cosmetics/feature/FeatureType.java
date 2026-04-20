@@ -52,9 +52,16 @@ public enum FeatureType {
     HIT_EFFECT   ("Hit Effect",   Category.COMBAT, Caps.COLOR | Caps.SIZE | Caps.COUNT | Caps.STYLE),
     TRIGGER_BOT  ("Trigger Bot",  Category.COMBAT, Caps.TRIGGER),
     BOW_AIMBOT   ("Bow Aimbot",   Category.COMBAT, Caps.BOWAIMBOT),
-    HITBOX       ("Hitbox",       Category.COMBAT, Caps.HITBOX);
+    HITBOX       ("Hitbox",       Category.COMBAT, Caps.HITBOX),
 
-    public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY }
+    // Optimizations
+    FAR_VIEW         ("Far View",         Category.OPTIM, 0),
+    FPS_BOOST        ("FPS Boost",        Category.OPTIM, 0),
+    FAST_GRAPHICS    ("Fast Graphics",    Category.OPTIM, 0),
+    NO_CLOUDS        ("No Clouds",        Category.OPTIM, 0),
+    NO_ENTITY_SHADOW ("No Entity Shadow", Category.OPTIM, 0);
+
+    public enum Category { TRAILS, PARTICLES, HAT, WINGS, EFFECTS, COMBAT, HUD, ANIM, UTILITY, OPTIM }
 
     public static final class Caps {
         public static final int COLOR    = 1 << 0;

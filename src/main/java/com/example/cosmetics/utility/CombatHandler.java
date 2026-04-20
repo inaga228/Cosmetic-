@@ -58,7 +58,6 @@ public final class CombatHandler {
         if (mc.level == null || mc.player == null) return;
         ClientPlayerEntity player = mc.player;
 
-        tickNoFireOverlay(player);
         tickKillAura(mc, player);
         tickAutoClicker(mc, player);
         tickSmoothAim(mc, player);
@@ -71,14 +70,6 @@ public final class CombatHandler {
         if (!CosmeticsState.get().isOn(FeatureType.KILL_AURA)) {
             tickStandaloneCrit(player);
         }
-    }
-
-    // =========================================================================
-    // NO FIRE OVERLAY
-    // =========================================================================
-    private static void tickNoFireOverlay(ClientPlayerEntity player) {
-        if (!CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) return;
-        if (player.getRemainingFireTicks() > 0) player.setRemainingFireTicks(0);
     }
 
     // =========================================================================
