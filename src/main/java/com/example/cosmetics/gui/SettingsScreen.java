@@ -374,6 +374,7 @@ public class SettingsScreen extends Screen {
             toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Debug (show hitboxes)",
                     () -> fs.hitboxDebug, v -> fs.hitboxDebug = v));
         }
+    } // end addBoolWidgets
 
     // ── Layout helpers ─────────────────────────────────────────────────────────
 
