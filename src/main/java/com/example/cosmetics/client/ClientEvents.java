@@ -103,9 +103,12 @@ public final class ClientEvents {
     // ── No Fire Overlay — перехватываем рендер оверлея FIRE ─────────────────
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRenderOverlayPre(RenderGameOverlayEvent.Pre event) {
-        if (event.getType() == RenderGameOverlayEvent.ElementType.FIRE_OVERLAY) {
+        if (event.getType() == RenderGameOverlayEvent.ElementType.HELMET) {
             if (CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) {
-                event.setCanceled(true); // полностью блокируем рендер огня
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.player != null && mc.player.isOnFire()) {
+                    event.setCanceled(true);
+                }
             }
         }
     }
