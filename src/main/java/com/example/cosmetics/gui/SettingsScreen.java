@@ -282,7 +282,7 @@ public class SettingsScreen extends Screen {
         // ---- TriggerBot ------------------------------------------------------
         else if (feature == FeatureType.TRIGGER_BOT) {
             sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Delay ms", 0F, 500F,
-                    () -> (float) fs.triggerDelay, v -> fs.triggerDelay = (long) v) {
+                    () -> (double) fs.triggerDelay, v -> fs.triggerDelay = (long)(float) v) {
                 @Override public String formatValue() {
                     return fs.triggerDelay == 0 ? "0 ms (instant)" : fs.triggerDelay + " ms";
                 }

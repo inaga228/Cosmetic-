@@ -81,9 +81,7 @@ public final class HitboxExpander {
      * Расширяет хитбокс сущности и проверяет попадание луча.
      */
     private static Entity expandedRaytrace(Minecraft mc, ClientPlayerEntity player, FeatureSettings fs) {
-        float reach = (float) player.getAttribute(
-                net.minecraft.entity.ai.attributes.Attributes.ATTACK_REACH) != 0
-                ? 3.0F : 3.0F; // в 1.16.5 нет ATTACK_REACH, используем 3.0
+        float reach = 3.0F; // ATTACK_REACH не существует в Minecraft 1.16.5
 
         Vector3d eye  = player.getEyePosition(1F);
         Vector3d look = player.getLookAngle();
