@@ -401,7 +401,6 @@ public class SettingsScreen extends Screen {
             toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Target Passive",
                     () -> fs.espTargetPassive, v -> fs.espTargetPassive = v));
         }
-    }
 
     // ── Layout helpers ─────────────────────────────────────────────────────────
 
