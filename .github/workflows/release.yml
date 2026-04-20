@@ -49,25 +49,42 @@ jobs:
 
       - name: Get tag name
         id: tag
-        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "tag=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.tag.outputs.tag }}"
+          # Берём блок между ## [VERSION] и следующим ## [
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="Нет описания. Добавь раздел \`## [$VERSION]\` в CHANGELOG.md"
+          fi
+          # Сохраняем многострочный вывод
+          {
+            echo "notes<<EOF_NOTES"
+            echo "$NOTES"
+            echo "EOF_NOTES"
+          } >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: "Cosmetics Mod ${{ steps.tag.outputs.tag }}"
+          tag_name: v${{ steps.tag.outputs.tag }}
+          name: "🎨 Cosmetics Mod v${{ steps.tag.outputs.tag }}"
           body: |
-            ## 🎨 Cosmetics Mod ${{ steps.tag.outputs.tag }}
+            ## 🎨 Cosmetics Mod v${{ steps.tag.outputs.tag }}
 
-            **Minecraft:** 1.16.5  
-            **Forge:** 36+
+            **Minecraft:** 1.16.5 | **Forge:** 36+
 
-            ### 📥 Установка
-            1. Скачай файл `.jar` ниже
-            2. Положи в папку `.minecraft/mods/`
-            3. Запускай игру, открывай меню через **Right Shift**
+            ${{ steps.changelog.outputs.notes }}
 
             ---
+            ### 📥 Установка
+            1. Скачай `.jar` файл ниже
+            2. Положи в `.minecraft/mods/`
+            3. Запускай игру → **Right Shift** для открытия меню
+
             *Собрано автоматически через GitHub Actions*
           files: build/libs/*.jar
           draft: false
