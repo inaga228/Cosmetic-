@@ -42,7 +42,6 @@ public enum FeatureType {
 
     // Combat
     NO_FIRE_OVERLAY ("No Fire Overlay", Category.COMBAT, 0),
-    ESP          ("ESP",          Category.COMBAT, Caps.COLOR | Caps.SIZE | Caps.BOOL | Caps.ESP),
     KILL_AURA    ("Kill Aura",    Category.COMBAT, Caps.SIZE | Caps.BOOL | Caps.KILLAURA),
     CRIT         ("Crit",         Category.COMBAT, 0),
     AUTO_CLICKER ("Auto Clicker", Category.COMBAT, Caps.COUNT | Caps.SPEED | Caps.BOOL),

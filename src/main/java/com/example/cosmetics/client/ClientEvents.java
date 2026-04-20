@@ -11,7 +11,6 @@ import com.example.cosmetics.gui.McMainMenuScreen;
 import com.example.cosmetics.hud.CosmeticsHud;
 import com.example.cosmetics.hud.TargetHud;
 import com.example.cosmetics.particles.ParticleManager;
-import com.example.cosmetics.render.EspRenderer;
 import com.example.cosmetics.render.CapeRenderer;
 import com.example.cosmetics.combat.TriggerBot;
 import com.example.cosmetics.combat.BowAimbot;
@@ -100,16 +99,21 @@ public final class ClientEvents {
         }
     }
 
-    // ── No Fire Overlay — перехватываем рендер оверлея FIRE ─────────────────
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void onRenderOverlayPre(RenderGameOverlayEvent.Pre event) {
-        if (event.getType() == RenderGameOverlayEvent.ElementType.HELMET) {
-            if (CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null && mc.player.isOnFire()) {
-                    event.setCanceled(true);
-                }
-            }
+    // ── No Fire Overlay ──────────────────────────────────────────────────────
+    // В 1.16.5 огонь рендерит ForgeIngameGui через отдельный вызов blit.
+    // Единственный надёжный способ без миксинов — сбрасывать fireTicks до 0
+    // каждый тик ПЕРЕД рендером, чтобы IngameGui думал что игрок не горит.
+    // Мы делаем это в onClientTick (см. ниже) и дополнительно через
+    // RenderGameOverlayEvent.Pre ALL — форсируем сброс прямо перед рендером HUD.
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onRenderOverlayPreAll(RenderGameOverlayEvent.Pre event) {
+        if (event.getType() != RenderGameOverlayEvent.ElementType.ALL) return;
+        if (!CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        // Временно сбрасываем fireTicks — IngameGui проверяет player.getRemainingFireTicks() > 0
+        if (mc.player.getRemainingFireTicks() > 0) {
+            mc.player.setRemainingFireTicks(0);
         }
     }
 
@@ -128,7 +132,6 @@ public final class ClientEvents {
         HatRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         CapeRenderer.render(event.getMatrixStack(), event.getPartialTicks());
         JumpCircles.get().renderAll(event.getMatrixStack(), event.getPartialTicks());
-        EspRenderer.render(event);
     }
 
     @SubscribeEvent
