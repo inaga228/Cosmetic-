@@ -26,7 +26,6 @@ import com.example.cosmetics.utility.OptimizationHandler;
 import com.example.cosmetics.utility.UtilityHandler;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.MainMenuScreen;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
@@ -96,7 +95,7 @@ public final class ClientEvents {
     // ── Заменяем ванильное главное меню на кастомное ────────────────────────
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onGuiOpen(GuiOpenEvent event) {
-        if (event.getGui() instanceof MainMenuScreen) {
+        if (event.getGui() instanceof net.minecraft.client.gui.screen.MainMenuScreen) {
             event.setGui(new McMainMenuScreen());
         }
     }
@@ -104,7 +103,7 @@ public final class ClientEvents {
     // ── No Fire Overlay — перехватываем рендер оверлея FIRE ─────────────────
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRenderOverlayPre(RenderGameOverlayEvent.Pre event) {
-        if (event.getType() == RenderGameOverlayEvent.ElementType.FIRE) {
+        if (event.getType() == RenderGameOverlayEvent.ElementType.FIRE_OVERLAY) {
             if (CosmeticsState.get().isOn(FeatureType.NO_FIRE_OVERLAY)) {
                 event.setCanceled(true); // полностью блокируем рендер огня
             }
