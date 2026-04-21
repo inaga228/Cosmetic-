@@ -263,12 +263,35 @@ public class SettingsScreen extends Screen {
                     () -> fs.killAuraRaytrace, v -> fs.killAuraRaytrace = v));
             toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Swing Animation",
                     () -> fs.killAuraSwing, v -> fs.killAuraSwing = v));
+            // --- Smooth rotation ---
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Smooth Rotation",
+                    () -> fs.killAuraSmoothRotation, v -> fs.killAuraSmoothRotation = v));
+            sliders.add(new Slider(sx, sy + i++ * ROW_H, sw, 17, "Smooth Factor", 0.05F, 0.95F,
+                    () -> fs.killAuraSmoothFactor, v -> fs.killAuraSmoothFactor = v) {
+                @Override public String formatValue() {
+                    return String.format("%.2f", fs.killAuraSmoothFactor);
+                }
+            });
+            // --- Anti-cheat bypass ---
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "GCD Fix (anti-cheat)",
+                    () -> fs.killAuraGcd, v -> fs.killAuraGcd = v));
+            // --- Misc ---
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Auto Best Weapon",
+                    () -> fs.killAuraAutoWeapon, v -> fs.killAuraAutoWeapon = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Auto Block",
+                    () -> fs.killAuraAutoBlock, v -> fs.killAuraAutoBlock = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Attack Creative",
+                    () -> fs.killAuraAttackCreative, v -> fs.killAuraAttackCreative = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Ignore Already Targeted",
+                    () -> fs.killAuraIgnoreAlreadyTargeted, v -> fs.killAuraIgnoreAlreadyTargeted = v));
+            toggles.add(new ToggleButton(sx, sy + i++ * ROW_H, sw, 17, "Pause On Chat",
+                    () -> fs.killAuraPauseOnChat, v -> fs.killAuraPauseOnChat = v));
         }
 
         // ---- Strafe ----------------------------------------------------------
         else if (feature == FeatureType.STRAFE) {
             cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Mode",
-                    new String[]{"Circle", "Side", "Zigzag"},
+                    new String[]{"Circle", "Side", "Zigzag", "Predictive"},
                     () -> fs.strafeMode, v -> fs.strafeMode = v));
             cycles.add(new CycleButton(sx, sy + i++ * ROW_H, sw, 17, "Direction",
                     new String[]{"Left", "Right", "Random"},

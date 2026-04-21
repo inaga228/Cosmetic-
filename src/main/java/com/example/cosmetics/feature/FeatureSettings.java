@@ -75,10 +75,17 @@ public final class FeatureSettings {
     public boolean strafeJitter             = false; // мелкое смещение против предсказания
 
     // ---- Kill Aura extended -------------------------------------------------
-    public boolean killAuraPauseOnChat      = true;  // пауза при открытом чате
-    public boolean killAuraAttackCreative   = false; // атаковать игроков в креативе
-    public boolean killAuraAutoBlock        = false; // авто-блок после атаки (ПКМ)
+    public boolean killAuraPauseOnChat           = true;  // пауза при открытом чате
+    public boolean killAuraAttackCreative        = false; // атаковать игроков в креативе
+    public boolean killAuraAutoBlock             = false; // авто-блок после атаки (ПКМ)
     public boolean killAuraIgnoreAlreadyTargeted = false; // не атаковать уже атакуемых
+    // Smooth rotation
+    public boolean killAuraSmoothRotation   = true;  // плавное наведение
+    public float   killAuraSmoothFactor     = 0.35F; // коэффициент плавности (0.1–0.5)
+    // GCD-коррекция углов для обхода античитов
+    public boolean killAuraGcd              = true;
+    // Автовыбор лучшего оружия из хотбара
+    public boolean killAuraAutoWeapon       = false;
     public float   killAuraMinRange         = 0.5F;
     public boolean killAuraIgnoreWalls      = false;
     public boolean killAuraSwing            = true;

@@ -107,9 +107,15 @@ public final class CombatHandler {
         FeatureSettings fs = CosmeticsState.get().settings(FeatureType.KILL_AURA);
 
         // Паузы
-        if (mc.screen != null) return;
-        if (fs.killAuraPauseOnChat && mc.screen instanceof net.minecraft.client.gui.screen.ChatScreen) return;
+        if (mc.screen instanceof net.minecraft.client.gui.screen.ChatScreen) return;
+        if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screen.ChatScreen)) {
+            if (isRotating) restoreRotation(mc, player);
+            return;
+        }
         if (fs.killAuraNoAttackOnUse && player.isUsingItem()) return;
+
+        // Автовыбор лучшего оружия
+        if (fs.killAuraAutoWeapon) switchToBestWeapon(player);
 
         // Поиск целей
         List<LivingEntity> targets = getValidTargets(mc, player, fs);
@@ -125,7 +131,7 @@ public final class CombatHandler {
         // Проверка задержки
         boolean canAttackNow;
         if (fs.killAuraDelayMode == 1) {
-            canAttackNow = player.getAttackStrengthScale(-fs.killAuraExtraTicks) >= 1.0F;
+            canAttackNow = player.getAttackStrengthScale(-fs.killAuraExtraTicks) >= 0.98F;
         } else {
             int interval = Math.max(1, fs.killAuraTickInterval);
             canAttackNow = (auraTicks - lastAttackTick) >= interval;
@@ -142,14 +148,12 @@ public final class CombatHandler {
         // Рандом шанс удара
         if (RNG.nextInt(100) >= fs.killAuraHitChance) return;
 
-        // Подготовка поворота
+        // Подготовка поворота (с GCD и smooth)
         prepareRotation(mc, player, primary, fs);
 
-        // Auto Crit (микро-прыжок)
+        // Auto Crit — настоящий прыжок (без детекта микро-движения)
         if (fs.killAuraAutoCrit && canCrit(player)) {
-            player.setDeltaMovement(
-                    player.getDeltaMovement().x, 0.11,
-                    player.getDeltaMovement().z);
+            player.jumpFromGround();
         }
 
         // Атака
@@ -158,6 +162,29 @@ public final class CombatHandler {
         lastAttackMs            = now;
         lastAttackTick          = auraTicks;
         lastAttackMsForRotation = now;
+    }
+
+    // ---- Автовыбор оружия ---------------------------------------------------
+    private static void switchToBestWeapon(ClientPlayerEntity player) {
+        int bestSlot = -1;
+        double bestDmg = -1;
+        for (int i = 0; i < 9; i++) {
+            ItemStack stack = player.inventory.items.get(i);
+            double dmg = getSwordDamage(stack);
+            if (dmg > bestDmg) { bestDmg = dmg; bestSlot = i; }
+        }
+        if (bestSlot != -1 && player.inventory.selected != bestSlot)
+            player.inventory.selected = bestSlot;
+    }
+
+    private static double getSwordDamage(ItemStack stack) {
+        if (stack.getItem() == Items.NETHERITE_SWORD)  return 9.0;
+        if (stack.getItem() == Items.DIAMOND_SWORD)    return 8.0;
+        if (stack.getItem() == Items.IRON_SWORD)       return 7.0;
+        if (stack.getItem() == Items.STONE_SWORD)      return 6.0;
+        if (stack.getItem() == Items.GOLDEN_SWORD)     return 5.0;
+        if (stack.getItem() == Items.WOODEN_SWORD)     return 5.0;
+        return -1;
     }
 
     // ---- Поиск целей --------------------------------------------------------
@@ -220,7 +247,7 @@ public final class CombatHandler {
                 if (Math.abs(wrapDeg(needYaw - player.yRot)) > fov / 2F) return false;
             }
 
-            // Вертикальный FOV (исправленный)
+            // Вертикальный FOV
             if (vFov < 360F) {
                 double dx = e.getX() - player.getX();
                 double dy = (e.getY() + e.getBbHeight() * fs.killAuraAimHeight)
@@ -264,11 +291,8 @@ public final class CombatHandler {
         return targets.get(0);
     }
 
-    // ---- Поворот ------------------------------------------------------------
-    private void prepareRotation(Minecraft mc, ClientPlayerEntity player,
-                                  LivingEntity target, FeatureSettings fs) {
-        if (fs.killAuraRotMode == 0) return;
-
+    // ---- Расчёт углов (с GCD-коррекцией) ------------------------------------
+    private float[] calcAngles(ClientPlayerEntity player, LivingEntity target, FeatureSettings fs) {
         double aimH = MathHelper.clamp(fs.killAuraAimHeight, 0.0F, 1.0F);
         Vector3d targetPos = target.position().add(0, target.getBbHeight() * aimH, 0);
         Vector3d delta = targetPos.subtract(player.getEyePosition(1F));
@@ -278,29 +302,62 @@ public final class CombatHandler {
                 Math.sqrt(delta.x * delta.x + delta.z * delta.z)));
         pitch = MathHelper.clamp(pitch, -90F, 90F);
 
-        // Шум углов — натуральное движение мыши
+        // Шум углов
         if (fs.killAuraRandomizeAngles) {
             yaw   += (RNG.nextFloat() - 0.5F) * fs.killAuraAngleNoise;
             pitch += (RNG.nextFloat() - 0.5F) * fs.killAuraAngleNoise;
         }
 
-        targetYaw   = yaw;
-        targetPitch = pitch;
+        // GCD-коррекция для имитации натурального ввода мыши (обход Grim/Vulcan)
+        if (fs.killAuraGcd) {
+            yaw   = applyGcd(yaw,   player.yRot);
+            pitch = applyGcd(pitch, player.xRot);
+        }
+
+        return new float[]{yaw, pitch};
+    }
+
+    /**
+     * GCD-коррекция: округляет дельту угла до ближайшего "шага мыши",
+     * чтобы изменение угла выглядело как реальное движение мышью.
+     */
+    private static float applyGcd(float target, float current) {
+        float delta = target - current;
+        if (Math.abs(delta) <= 0.0F) return current;
+        float divisor = 0.15F;
+        float adjusted = Math.round(delta / divisor) * divisor;
+        if (Math.abs(adjusted) < 0.001F) adjusted = 0.0F;
+        return current + adjusted;
+    }
+
+    // ---- Поворот ------------------------------------------------------------
+    private void prepareRotation(Minecraft mc, ClientPlayerEntity player,
+                                  LivingEntity target, FeatureSettings fs) {
+        if (fs.killAuraRotMode == 0) return;
+
+        float[] angles = calcAngles(player, target, fs);
+        targetYaw   = angles[0];
+        targetPitch = angles[1];
 
         switch (Math.floorMod(fs.killAuraRotMode, 4)) {
-            case 1: // NORMAL — полный поворот камеры
-                player.yRot     = targetYaw;
-                player.xRot     = targetPitch;
-                player.yBodyRot = targetYaw;
-                player.yHeadRot = targetYaw;
+            case 1: // NORMAL — поворот камеры (с опциональным smooth)
+                if (fs.killAuraSmoothRotation) {
+                    player.yRot = lerpAngle(player.yRot, targetYaw,   fs.killAuraSmoothFactor);
+                    player.xRot = lerp(player.xRot,      targetPitch, fs.killAuraSmoothFactor);
+                } else {
+                    player.yRot = targetYaw;
+                    player.xRot = targetPitch;
+                }
+                player.yBodyRot = player.yRot;
+                player.yHeadRot = player.yRot;
                 break;
-            case 2: // SILENT — пакет на сервер, потом восстанавливаем камеру
+            case 2: // SILENT — пакет на сервер, камера не трогается
                 sendRotationPacket(mc, player, targetYaw, targetPitch);
                 isRotating    = true;
                 originalYaw   = player.yRot;
                 originalPitch = player.xRot;
                 break;
-            case 3: // SERVER_ONLY — только пакет, камера не трогается вообще
+            case 3: // SERVER_ONLY — только пакет
                 sendRotationPacket(mc, player, targetYaw, targetPitch);
                 isRotating    = true;
                 originalYaw   = clientYaw;
@@ -358,7 +415,7 @@ public final class CombatHandler {
         }
     }
 
-    // ---- Задержка (Гаусс) ---------------------------------------------------
+    // ---- Задержка -----------------------------------------------------------
     private static int calculateDelayMs(FeatureSettings fs) {
         int min  = Math.max(0, (int) fs.killAuraAttackDelay);
         int rand = Math.max(0, (int) fs.killAuraAttackDelayRand);
